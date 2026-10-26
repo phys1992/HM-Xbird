@@ -30,6 +30,8 @@ export struct NativeShell {
   @State notificationsLoaded: boolean = false;
   @State profile: UserProfile | null = null;
   @State profileLoading: boolean = false;
+  @State myTweets: TweetItem[] = [];
+  @State myLoading: boolean = false;
   @State splitEnabled: boolean = true;
   @State playingVideo: string = '';
   @State viewingImage: string = '';
@@ -150,10 +152,24 @@ export struct NativeShell {
     this.profileLoading = true;
     try {
       this.profile = await XApi.userByRestId(this.cookie, id);
+      this.loadMyTweets(id);
     } catch (e) {
       // Keep the page usable; profile header is optional.
     } finally {
       this.profileLoading = false;
+    }
+  }
+
+  private async loadMyTweets(id: string): Promise<void> {
+    if (this.myLoading) return;
+    this.myLoading = true;
+    try {
+      const page = await XApi.userTweets(this.cookie, id, '');
+      this.myTweets = page.tweets;
+    } catch (e) {
+      this.myTweets = [];
+    } finally {
+      this.myLoading = false;
     }
   }
 
@@ -351,7 +367,32 @@ export struct NativeShell {
       Row() {
         Text('退出登录').fontSize(15).fontColor('#F4212E')
       }.width('100%').padding(16).onClick(() => this.logout())
-      Blank()
+
+      Divider().color('#EFF3F4')
+      Row() {
+        Text('最近帖子').fontSize(15).fontWeight(FontWeight.Bold).layoutWeight(1)
+        if (this.myLoading) LoadingProgress().width(16).height(16)
+      }.width('100%').padding({ left: 16, right: 16, top: 10, bottom: 6 })
+
+      List() {
+        ForEach(this.myTweets, (item: TweetItem) => {
+          ListItem() {
+            Column() {
+              TweetCard({
+                item: item,
+                cookie: this.cookie,
+                onReply: (value: TweetItem) => this.openReply(value),
+                onQuote: (value: TweetItem) => this.openQuote(value),
+                onOpen: (value: TweetItem) => this.openDetail(value),
+                onPlay: (value: TweetItem) => this.playingVideo = value.videoUrl,
+                onImage: (url: string) => { this.imageScale = 1; this.viewingImage = url; },
+                onOpenQuoted: (id: string) => this.openQuoted(id)
+              })
+              Divider().color('#EFF3F4')
+            }
+          }
+        }, (item: TweetItem) => item.id)
+      }.layoutWeight(1).width('100%')
     }.width('100%').height('100%')
   }
 

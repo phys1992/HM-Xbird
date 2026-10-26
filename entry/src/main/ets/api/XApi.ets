@@ -839,4 +839,62 @@ export class XApi {
     return result;
   }
 
+
+  static async userTweets(cookie: string, userId: string, cursor: string): Promise<HomeResult> {
+    const queryId = await QueryIds.resolve(cookie, 'UserTweets');
+    const variables: Record<string, Object> = {
+      'userId': userId,
+      'count': 20,
+      'includePromotedContent': false,
+      'withVoice': true
+    };
+    if (cursor.length > 0) variables['cursor'] = cursor;
+    const url = `https://x.com/i/api/graphql/${queryId}/UserTweets` +
+      `?variables=${encodeURIComponent(JSON.stringify(variables))}` +
+      `&features=${encodeURIComponent(JSON.stringify(READ_FEATURES))}`;
+    const request = http.createHttp();
+    let text = '';
+    try {
+      const response = await request.request(url, {
+        method: http.RequestMethod.GET,
+        header: XApi.headers(cookie),
+        expectDataType: http.HttpDataType.STRING,
+        connectTimeout: 20000,
+        readTimeout: 20000
+      });
+      if (response.responseCode < 200 || response.responseCode >= 300) {
+        throw new Error(`HTTP ${response.responseCode}`);
+      }
+      text = response.result as string;
+    } finally {
+      request.destroy();
+    }
+    const root = asObj(JSON.parse(text) as Object);
+    const data = asObj(root == null ? null : root['data']);
+    const user = asObj(data == null ? null : data['user']);
+    const resultObj = asObj(user == null ? null : user['result']);
+    const timelineV2 = asObj(resultObj == null ? null : resultObj['timeline_v2']);
+    const timeline = asObj(timelineV2 == null ? null : timelineV2['timeline']);
+    const instructions = asArr(timeline == null ? null : timeline['instructions']);
+    const result = new HomeResult();
+    for (const rawInstruction of instructions) {
+      const instruction = asObj(rawInstruction);
+      if (instruction == null || asString(instruction['type']) != 'TimelineAddEntries') continue;
+      for (const rawEntry of asArr(instruction['entries'])) {
+        const entry = asObj(rawEntry);
+        if (entry == null) continue;
+        const entryId = asString(entry['entryId']);
+        if (entryId.indexOf('cursor-bottom') >= 0) {
+          const content = asObj(entry['content']);
+          result.cursor = asString(content == null ? null : content['value']);
+          continue;
+        }
+        if (entryId.indexOf('tweet-') < 0) continue;
+        const item = parseTweet(entry);
+        if (item != null && item.id.length > 0) result.tweets.push(item);
+      }
+    }
+    return result;
+  }
+
 }

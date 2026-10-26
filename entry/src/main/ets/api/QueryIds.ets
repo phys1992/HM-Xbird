@@ -86,6 +86,7 @@ export class QueryIds {
       earlyFallback.set('TweetDetail', 'wjV7NuWEsHgTBFfW3zYKzQ');
       earlyFallback.set('SearchTimeline', 'BYppgupFFS2yqVmmRNjlsw');
       earlyFallback.set('UserByRestId', 'mxaYWwt52eAb6OAzYHMVzg');
+      earlyFallback.set('UserTweets', 'OdBLACRZ0-9NikpJotaT7g');
       const early = earlyFallback.get(operation);
       if (early != undefined) return early;
     }
@@ -150,6 +151,7 @@ export class QueryIds {
     fallback.set('TweetDetail', 'wjV7NuWEsHgTBFfW3zYKzQ');
     fallback.set('SearchTimeline', 'BYppgupFFS2yqVmmRNjlsw');
     fallback.set('UserByRestId', 'mxaYWwt52eAb6OAzYHMVzg');
+    fallback.set('UserTweets', 'OdBLACRZ0-9NikpJotaT7g');
     const known = fallback.get(operation);
     if (known != undefined) return known;
     throw new Error(`无法解析 ${operation} 的 queryId（已扫描 ${urls.length} 个脚本）`);
