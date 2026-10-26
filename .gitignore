@@ -1,0 +1,6 @@
+build/
+.hvigor/
+oh_modules/
+build-out/
+*.hap
+!releases/**/*.hap

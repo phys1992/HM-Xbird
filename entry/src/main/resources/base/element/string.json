@@ -1,0 +1,7 @@
+{
+  "string": [
+    { "name": "module_desc", "value": "Native X client" },
+    { "name": "EntryAbility_desc", "value": "X Harmony" },
+    { "name": "EntryAbility_label", "value": "X Harmony" }
+  ]
+}
