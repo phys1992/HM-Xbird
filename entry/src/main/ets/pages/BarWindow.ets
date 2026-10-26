@@ -4,6 +4,7 @@ import { display } from '@kit.ArkUI';
 @Component
 struct BarWindow {
   @StorageLink('barSide') @Watch('onSideChanged') side: number = 1;
+  @StorageLink('barActive') active: number = 0;
   @State pillX: number = 0;
   @State sheenX: number = -160;
   private readonly pillW: number = 320;
@@ -52,33 +53,33 @@ struct BarWindow {
     Stack({ alignContent: Alignment.BottomStart }) {
       Stack({ alignContent: Alignment.Start }) {
         Row() {
-          this.item('主页', $r('app.media.ic_home'), 'home')
-          this.item('搜索', $r('app.media.ic_search'), 'search')
+          this.item('主页', $r('app.media.ic_home'), 'home', 0)
+          this.item('搜索', $r('app.media.ic_search'), 'search', 1)
           this.centerItem()
-          this.item('通知', $r('app.media.ic_bell'), 'notify')
-          this.item('我的', $r('app.media.ic_user'), 'me')
+          this.item('通知', $r('app.media.ic_bell'), 'notify', 2)
+          this.item('我的', $r('app.media.ic_user'), 'me', 3)
         }
         .width('100%').height('100%')
         .padding({ left: 6, right: 6 })
 
         // Ambient light sweep.
         Row()
-          .width(90).height('100%')
+          .width(120).height('100%')
           .linearGradient({
             angle: 90,
             colors: [['#00FFFFFF', 0.0], ['#80FFFFFF', 0.5], ['#00FFFFFF', 1.0]]
           })
           .blur(8)
-          .opacity(0.55)
+          .opacity(0.78)
           .offset({ x: this.sheenX })
           .hitTestBehavior(HitTestMode.None)
       }
       .width(this.pillW).height(60)
       .borderRadius(30)
       .clip(true)
-      .backgroundColor('#D9FFFFFF')
-      .backgroundBlurStyle(BlurStyle.Thin)
-      .border({ width: 0.5, color: '#B3FFFFFF' })
+      .backgroundColor('#B8FFFFFF')
+      .backgroundBlurStyle(BlurStyle.Thick)
+      .border({ width: 1, color: '#CCFFFFFF' })
       .shadow({ radius: 18, color: '#26000000', offsetY: 5 })
       .offset({ x: this.pillX })
       .margin({ bottom: 10 })
@@ -91,10 +92,17 @@ struct BarWindow {
   }
 
   @Builder
-  item(label: string, icon: Resource, action: string) {
+  item(label: string, icon: Resource, action: string, index: number) {
     Column() {
-      Image(icon).width(24).height(24).fillColor('#536471')
-      Text(label).fontSize(10).fontColor('#536471').margin({ top: 2 })
+      Image(icon).width(24).height(24)
+        .fillColor(this.active == index ? '#0A59F7' : '#536471')
+      Text(label).fontSize(10)
+        .fontColor(this.active == index ? '#0A59F7' : '#536471')
+        .fontWeight(this.active == index ? FontWeight.Medium : FontWeight.Normal)
+        .margin({ top: 2 })
+      Circle({ width: 4, height: 4 })
+        .fill(this.active == index ? '#0A59F7' : '#00000000')
+        .margin({ top: 3 })
     }
     .layoutWeight(1).height('100%').justifyContent(FlexAlign.Center)
     .onClick(() => this.dispatch(action))

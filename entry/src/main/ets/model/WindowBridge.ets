@@ -109,13 +109,10 @@ export class WindowBridge {
       const d = display.getDefaultDisplaySync();
       const density = d.densityPixels > 0 ? d.densityPixels : 3;
       const h = Math.round(80 * density);
-      let safeBottom = 0;
-      try {
-        const area = WindowBridge.bar.getWindowAvoidArea(window.AvoidAreaType.TYPE_SYSTEM);
-        safeBottom = area.bottomRect.height;
-      } catch (e) {}
+      // Bottom safe area is intentionally 0: the system Xiaoyi bar is always
+      // above app windows and may overlap the floating bar.
       await WindowBridge.bar.resize(d.width, h);
-      await WindowBridge.bar.moveWindowTo(0, d.height - h - safeBottom);
+      await WindowBridge.bar.moveWindowTo(0, d.height - h);
     } catch (e) {}
   }
 

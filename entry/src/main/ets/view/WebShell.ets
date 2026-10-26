@@ -15,6 +15,7 @@ class WebBridge {
   onPath: (path: string) => void = () => {};
   onPrefetch: (url: string) => void = () => {};
   onDom: (json: string) => void = () => {};
+  onSwipeTab: (dir: number) => void = () => {};
 
   openTweet(url: string): void {
     this.onOpenTweet(url);
@@ -35,6 +36,10 @@ class WebBridge {
   reportDom(json: string): void {
     this.onDom(json);
   }
+
+  swipeTab(dir: number): void {
+    this.onSwipeTab(dir);
+  }
 }
 
 /**
@@ -49,8 +54,11 @@ export struct WebShell {
   private leftController: webview.WebviewController = new webview.WebviewController();
   private rightController: webview.WebviewController = new webview.WebviewController();
   private auxController: webview.WebviewController = new webview.WebviewController();
+  private followingController: webview.WebviewController = new webview.WebviewController();
   @State composeCookie: string = '';
   private bridge: WebBridge = new WebBridge();
+  private followingBridge: WebBridge = new WebBridge();
+  private swiperController: SwiperController = new SwiperController();
 
   @State progress: number = 0;
   @State tab: number = 0;
@@ -58,7 +66,7 @@ export struct WebShell {
   @State showCompose: boolean = false;
   @State selectedUrl: string = '';
   @State viewportWidth: number = 360;
-  @State viewportHeight: number = 800;
+  @State viewportHeight: number = 0;
   @State screenWidthVp: number = 400;
   @State leftFraction: number = 1.0;
   @State isFoldModel: boolean = false;
@@ -72,9 +80,15 @@ export struct WebShell {
   @State webReady: boolean = false;
   @State auxPath: string = '';
   @State auxLoaded: boolean = false;
+  @State followingLoaded: boolean = false;
+  @State followingPath: string = '/home';
   @State foldedDetail: boolean = false;
   @State domInfo: string = '';
   @State statusBarVp: number = 0;
+  @State feedAlpha: number = 1;
+  @State feedShift: number = 0;
+  @State homeIndex: number = 0;
+  @State leftReady: boolean = false;
   @State splitEnabled: boolean = true;
   @State @Watch('onMeChanged') showMe: boolean = false;
   @StorageLink('barMoveSide') @Watch('onBarMoveSide') barMoveSide: number = 1;
@@ -105,7 +119,12 @@ export struct WebShell {
     BackDispatcher.handler = () => this.handleBack();
     AppStorage.setOrCreate('barMoveSide', 1);
     AppStorage.setOrCreate('backTick', 0);
+    AppStorage.setOrCreate('barActive', 0);
     const context = getContext(this) as common.UIAbilityContext;
+    try {
+      const d = display.getDefaultDisplaySync();
+      this.viewportHeight = d.height / (d.densityPixels > 0 ? d.densityPixels : 3);
+    } catch (e) {}
     window.getLastWindow(context).then((win) => {
       try {
         const area = win.getWindowAvoidArea(window.AvoidAreaType.TYPE_SYSTEM);
@@ -175,10 +194,28 @@ export struct WebShell {
     this.bridge.onPath = (path: string) => {
       if (path.length > 0) this.currentPath = path;
     };
+    this.followingBridge.onOpenMe = () => this.openMe();
+    this.followingBridge.onOpenTweet = (url: string) => {
+      if (!this.splitEnabled) {
+        this.followingController.loadUrl(url);
+      } else if (this.isExpanded) {
+        this.selectedUrl = url;
+        this.rightController.loadUrl(url);
+      } else {
+        this.selectedUrl = url;
+        this.rightController.loadUrl(url);
+        this.foldedDetail = true;
+      }
+    };
+    this.followingBridge.onPath = (path: string) => {
+      if (path.length > 0) this.followingPath = path;
+    };
+    this.followingBridge.onSwipeTab = (dir: number) => {};
     this.bridge.onPrefetch = (url: string) => this.prefetchDetail(url);
     this.bridge.onDom = (json: string) => {
       console.info('XHDOM', json);
     };
+    this.bridge.onSwipeTab = (dir: number) => {};
     this.bridge.onOpenTweet = (url: string) => {
       if (!this.splitEnabled) {
         this.leftController.loadUrl(url);
@@ -210,6 +247,57 @@ export struct WebShell {
       }
       window.__xhAnchor = '';
     })()`).catch(() => {});
+  }
+
+  private repairWebChrome(): void {
+    const js = 'if(window.__xhHideFixedHeader)window.__xhHideFixedHeader();';
+    this.leftController.runJavaScript(js).catch(() => {});
+    this.followingController.runJavaScript(js).catch(() => {});
+  }
+
+  private earlyCssScript(): string {
+    return `(function(){var s=document.createElement('style');s.id='xh-early';s.textContent='header,[data-testid="TopBar"],[role="tablist"],[aria-label*="Add"],[aria-label*="添加"],div:has(> [role="tablist"]){display:none!important;}';if(document.head){document.head.appendChild(s);}else{document.documentElement.appendChild(s);}})();`;
+  }
+
+  private animateTabSwitch(dir: number, action: () => void): void {
+    const shift = dir == 0 ? 0 : (dir < 0 ? -28 : 28);
+    animateTo({ duration: 140, curve: Curve.EaseIn }, () => {
+      this.feedAlpha = 0.25;
+      this.feedShift = shift;
+    });
+    setTimeout(() => {
+      action();
+      animateTo({ duration: 260, curve: Curve.EaseOut }, () => {
+        this.feedAlpha = 1;
+        this.feedShift = 0;
+      });
+    }, 140);
+  }
+
+  private swipeHome(dir: number): void {
+    if (this.tab != 0) return;
+    const next = (this.homeIndex + dir + 2) % 2;
+    // changeIndex(..., true) uses Swiper's own duration/curve animation.
+    this.swiperController.changeIndex(next, true);
+  }
+
+  private switchHomeTab(dir: number): void {
+    if (this.tab != 0) return;
+    const js = `(function(){
+      var tabs = Array.prototype.slice.call(document.querySelectorAll('[role="tab"]'));
+      tabs = tabs.filter(function(t){ return t.offsetParent !== null; });
+      if (tabs.length < 2) return;
+      var idx = -1;
+      for (var i = 0; i < tabs.length; i++) {
+        if (tabs[i].getAttribute('aria-selected') === 'true') { idx = i; break; }
+      }
+      if (idx < 0) idx = 0;
+      var next = (idx + (${dir}) + tabs.length) % tabs.length;
+      tabs[next].click();
+    })()`;
+    this.animateTabSwitch(dir, () => {
+      this.leftController.runJavaScript(js).catch(() => {});
+    });
   }
 
   private dumpTopDom(): void {
@@ -345,6 +433,12 @@ export struct WebShell {
     } else {
       this.foldedDetail = false;
     }
+    this.leftReady = false;
+    setTimeout(() => this.repairWebChrome(), 350);
+    setTimeout(() => this.repairWebChrome(), 900);
+    setTimeout(() => this.repairWebChrome(), 1600);
+    setTimeout(() => this.repairWebChrome(), 2600);
+    setTimeout(() => { this.leftReady = true; }, 1200);
     this.leftController.runJavaScript(`window.__xhTwoPane = ${expanded};`).catch(() => {});
   }
 
@@ -382,6 +476,12 @@ export struct WebShell {
     } else {
       this.foldedDetail = false;
     }
+    this.leftReady = false;
+    setTimeout(() => this.repairWebChrome(), 350);
+    setTimeout(() => this.repairWebChrome(), 900);
+    setTimeout(() => this.repairWebChrome(), 1600);
+    setTimeout(() => this.repairWebChrome(), 2600);
+    setTimeout(() => { this.leftReady = true; }, 1200);
   }
 
   private async openCompose(): Promise<void> {
@@ -437,7 +537,12 @@ export struct WebShell {
 
   private hideCss(): string {
     return `
-      header, header[role="banner"], [data-testid="sidebarColumn"],
+      html, body, #react-root, main, [role="main"],
+      [data-testid="primaryColumn"] {
+        padding-bottom: 0 !important;
+        margin-bottom: 0 !important;
+      }
+      header[role="banner"], [data-testid="sidebarColumn"],
       [data-testid="BottomBar"], [data-testid="bottom-bar"] { display: none !important; }
       a[href="/messages"], a[href="/i/grok"], a[href="/grok"],
       a[href="/i/calls"], a[href*="/calls"],
@@ -447,7 +552,7 @@ export struct WebShell {
       a[href^="/i/creator_studio"], a[href^="/i/business"], a[href^="/i/ads"],
       a[href^="/i/spaces/start"], a[href="/settings"], a[href^="/settings"],
       a[href="/compose/post"], a[href*="/compose/post"],
-      [data-testid="TopBar"], [data-testid="toolBar"],
+      [data-testid="toolBar"],
       [data-testid="tweetButtonInline"], [data-testid="tweetTextarea_0"] {
         display: none !important;
       }
@@ -459,6 +564,42 @@ export struct WebShell {
     const script = `(function(){
       window.__xhNoComposerHide = ${!hideComposer};
       window.__xhStatusBar = ${this.statusBarVp};
+      window.__xhHideFixedHeader = function(){
+        var tab = null;
+        var nodes = document.querySelectorAll('div, span');
+        for (var i = 0; i < nodes.length; i++) {
+          var t = (nodes[i].textContent || '').trim();
+          if (t.indexOf('为你推荐') === 0 && t.length < 40) { tab = nodes[i]; break; }
+        }
+        if (!tab) return;
+        var row = tab;
+        for (var r = 0; r < 6 && row; r++) {
+          var rr = row.getBoundingClientRect();
+          if (rr.height >= 30 && rr.height <= 90 && rr.width > 200 &&
+              !row.querySelector('article')) {
+            row.style.setProperty('display', 'none', 'important');
+            break;
+          }
+          row = row.parentElement;
+        }
+        var h = tab;
+        for (var d = 0; d < 8 && h; d++) {
+          var cs = window.getComputedStyle(h);
+          if ((cs.position === 'fixed' || cs.position === 'sticky') &&
+              !h.querySelector('article')) {
+            h.style.setProperty('display', 'none', 'important');
+            break;
+          }
+          h = h.parentElement;
+        }
+        if (!window.__xhHeaderObs) {
+          window.__xhHeaderObs = new MutationObserver(function(){ window.__xhHideFixedHeader(); });
+          window.__xhHeaderObs.observe(document.body, { childList: true, subtree: true });
+        }
+      };
+      window.__xhHideFixedHeader();
+      setTimeout(window.__xhHideFixedHeader, 900);
+      setTimeout(window.__xhHideFixedHeader, 2200);
       window.__xhLiftHeader = function(){
         var tab = null;
         var nodes = document.querySelectorAll('div, span');
@@ -524,10 +665,6 @@ export struct WebShell {
           }
         } catch (e) {}
       };
-      window.__xhLiftHeader();
-      setTimeout(window.__xhLiftHeader, 900);
-      setTimeout(window.__xhLiftHeader, 2200);
-      window.addEventListener('scroll', function(){ window.__xhLiftHeader(); }, { passive: true });
       if (!document.getElementById('xh-style')) {
         var style = document.createElement('style');
         style.id = 'xh-style';
@@ -695,6 +832,44 @@ export struct WebShell {
         history.replaceState = function(){ var r = replace.apply(history, arguments); report(); return r; };
         window.addEventListener('popstate', report);
       }
+      if (!window.__xhSwipeHooked) {
+        window.__xhTopInset = function(){
+        var art = document.querySelector('article');
+        if (!art) return;
+        var p = art;
+        for (var i = 0; i < 10 && p; i++) {
+          var cs = window.getComputedStyle(p);
+          if (cs.overflowY === 'auto' || cs.overflowY === 'scroll') break;
+          p = p.parentElement;
+        }
+        if (p && p !== document.body) {
+          p.style.setProperty('padding-top', '0px', 'important');
+        } else {
+          art.style.setProperty('margin-top', '0px', 'important');
+        }
+      };
+
+      window.__xhSwipeHooked = true;
+        var sx = 0, sy = 0, swiping = false;
+        document.addEventListener('touchstart', function(e){
+          if (e.touches.length == 1) {
+            sx = e.touches[0].clientX;
+            sy = e.touches[0].clientY;
+            swiping = true;
+          }
+        }, { capture: true, passive: true });
+        document.addEventListener('touchend', function(e){
+          if (!swiping || e.changedTouches.length == 0) { swiping = false; return; }
+          var dx = e.changedTouches[0].clientX - sx;
+          var dy = e.changedTouches[0].clientY - sy;
+          swiping = false;
+          if (Math.abs(dx) > 28 && Math.abs(dx) > Math.abs(dy) * 1.1) {
+            if (window.xharmony && window.xharmony.swipeTab) {
+              window.xharmony.swipeTab(dx < 0 ? -1 : 1);
+            }
+          }
+        }, { capture: true, passive: true });
+      }
       if (!window.__xhTweetHooked) {
         window.__xhTweetHooked = true;
         document.addEventListener('click', function(e){
@@ -729,9 +904,11 @@ export struct WebShell {
     if (home) {
       // Home stays mounted; returning to it is a visibility switch, not a load.
       this.tab = 0;
+      AppStorage.setOrCreate('barActive', 0);
       return;
     }
     this.tab = next;
+    AppStorage.setOrCreate('barActive', next);
     if (this.auxPath != target) {
       this.auxController.loadUrl('https://x.com' + target);
     }
@@ -778,6 +955,15 @@ export struct WebShell {
       return true;
     }
 
+    if (this.tab == 0 && this.homeIndex == 1) {
+      if (this.followingPath != '/home' && this.followingPath != '/') {
+        this.followingController.runJavaScript('history.back()').catch(() => {});
+        return true;
+      }
+      this.homeIndex = 0;
+      return true;
+    }
+
     if (this.tab != 0) {
       // Auxiliary tab: back within it, then switch back to cached Home.
       if (this.auxPath != '/explore' && this.auxPath != '/notifications' && this.auxPath != '/') {
@@ -798,8 +984,9 @@ export struct WebShell {
   private onMeChanged(): void {
     if (this.showMe) {
       WindowBridge.hide();
-    } else if (this.isExpanded) {
-      WindowBridge.show();
+    } else {
+      AppStorage.setOrCreate('barActive', this.tab);
+      if (this.isExpanded) WindowBridge.show();
     }
   }
 
@@ -825,6 +1012,7 @@ export struct WebShell {
   }
 
   private async openMe(): Promise<void> {
+    AppStorage.setOrCreate('barActive', 3);
     animateTo({ duration: 220, curve: Curve.EaseOut }, () => {
       this.showMe = true;
     });
@@ -1053,11 +1241,10 @@ export struct WebShell {
       .javaScriptProxy({
         object: this.bridge,
         name: 'xharmony',
-        methodList: ['openTweet', 'openMe', 'reportPath', 'prefetch', 'reportDom'],
+        methodList: ['openTweet', 'openMe', 'reportPath', 'prefetch', 'reportDom', 'swipeTab'],
         controller: this.leftController
       })
       .width('100%').height('100%')
-      .visibility(this.tab == 0 ? Visibility.Visible : Visibility.None)
       .onProgressChange((event) => this.progress = event.newProgress)
       .onPageEnd((event) => {
         this.progress = 100;
@@ -1081,6 +1268,7 @@ export struct WebShell {
           this.leftController.runJavaScript(`window.__xhTwoPane = ${this.isExpanded};`).catch(() => {});
           this.injectUi(this.leftController, true);
           setTimeout(() => { WindowBridge.openBar(); }, 400);
+          setTimeout(() => { this.leftReady = true; }, 700);
           setTimeout(() => this.dumpTopDom(), 2200);
           if (this.isExpanded) {
             this.applyHalfWidthCss();
@@ -1095,6 +1283,37 @@ export struct WebShell {
         if (event.request.isMainFrame()) {
           promptAction.showToast({ message: `页面加载失败：${event.error.getErrorInfo()}` });
         }
+      })
+  }
+
+  @Builder
+  followingWeb() {
+    Web({ src: 'https://x.com/home', controller: this.followingController })
+      .userAgent(this.chromeUa)
+      .javaScriptProxy({
+        object: this.followingBridge,
+        name: 'xharmony',
+        methodList: ['openTweet', 'openMe', 'reportPath', 'prefetch', 'reportDom', 'swipeTab'],
+        controller: this.followingController
+      })
+      .javaScriptAccess(true).domStorageAccess(true).databaseAccess(true)
+      .onlineImageAccess(true).fileAccess(true).mixedMode(MixedMode.All).zoomAccess(true)
+      .width('100%').height('100%')
+      .onPageEnd(() => {
+        this.injectUi(this.followingController, true);
+        if (this.homeIndex == 1) setTimeout(() => { this.leftReady = true; }, 700);
+        this.followingController.runJavaScript(`(function(){
+          var tabs = Array.prototype.slice.call(document.querySelectorAll('[role="tab"]'));
+          for (var i = 0; i < tabs.length; i++) {
+            var t = (tabs[i].textContent || '').trim();
+            if (t.indexOf('正在关注') === 0 || t === 'Following') { tabs[i].click(); return; }
+          }
+        })()`).catch(() => {});
+        try {
+          const u = this.followingController.getUrl();
+          const at = u.indexOf('/', u.indexOf('://') + 3);
+          this.followingPath = at >= 0 ? u.substring(at) : '/home';
+        } catch (e) {}
       })
   }
 
@@ -1131,13 +1350,75 @@ export struct WebShell {
 
   build() {
     Stack({ alignContent: Alignment.Bottom }) {
+      // Extend under the system status bar; the tab bar paints that area.
+      
       Column() {
         SideBarContainer(SideBarContainerType.Embed) {
           Column() {
-            Stack() {
-              this.feedWeb()
+            Stack({ alignContent: Alignment.Top }) {
+              Swiper(this.swiperController) {
+                Column() { this.feedWeb() }.width('100%').height('100%')
+                Column() { this.followingWeb() }.width('100%').height('100%')
+              }
+              .index(this.homeIndex)
+              .indicator(false)
+              .cachedCount(2)
+              .loop(false)
+              .duration(600)
+              .curve(Curve.Friction)
+              .onChange((index: number) => {
+                this.homeIndex = index;
+                setTimeout(() => this.repairWebChrome(), 200);
+              })
+              .width('100%').height('100%')
+              .visibility(this.tab == 0 ? Visibility.Visible : Visibility.None)
+              .padding({ top: 30 })
+              .offset({ y: this.isExpanded ? -50 : 0 })
+              .height(this.isExpanded ? 'calc(100% + 50vp)' : '100%')
+
+              if (this.tab == 0) {
+                Row() {
+                  Column() {
+                    Text('为你推荐').fontSize(14)
+                      .fontWeight(this.homeIndex == 0 ? FontWeight.Bold : FontWeight.Normal)
+                      .fontColor(this.homeIndex == 0 ? '#0F1419' : '#536471')
+                    if (this.homeIndex == 0) {
+                      Row().width(48).height(2).borderRadius(1).backgroundColor('#1D9BF0').margin({ top: 5 })
+                    }
+                  }
+                  .layoutWeight(1).height(30).justifyContent(FlexAlign.End)
+                  .onClick(() => { this.swiperController.changeIndex(0, true); })
+
+                  Column() {
+                    Text('正在关注').fontSize(14)
+                      .fontWeight(this.homeIndex == 1 ? FontWeight.Bold : FontWeight.Normal)
+                      .fontColor(this.homeIndex == 1 ? '#0F1419' : '#536471')
+                    if (this.homeIndex == 1) {
+                      Row().width(48).height(2).borderRadius(1).backgroundColor('#1D9BF0').margin({ top: 5 })
+                    }
+                  }
+                  .layoutWeight(1).height(30).justifyContent(FlexAlign.End)
+                  .onClick(() => { this.swiperController.changeIndex(1, true); })
+                }
+                .width('100%').height(30)
+                .backgroundColor('#FFFFFF')
+                .zIndex(30)
+              }
+
               this.auxWeb()
+
+              if (!this.leftReady && this.tab == 0) {
+                Column() {
+                  LoadingProgress().width(48).height(48).color('#0A59F7')
+                }
+                .width('100%').height('100%')
+                .backgroundColor('#FFFFFF')
+                .justifyContent(FlexAlign.Center)
+                .zIndex(40)
+              }
             }.width('100%').height('100%')
+            .opacity(this.leftReady ? this.feedAlpha : 0)
+            .translate({ x: this.feedShift })
           }.width('100%').height('100%')
 
           Column() {
