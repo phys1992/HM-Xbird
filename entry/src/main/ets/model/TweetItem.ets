@@ -9,4 +9,11 @@ export class TweetItem {
   retweetCount: number = 0;
   likeCount: number = 0;
   imageUrl: string = '';
+  videoUrl: string = '';
+  mediaType: string = '';
+  quotedId: string = '';
+  quotedText: string = '';
+  quotedAuthorName: string = '';
+  quotedAuthorHandle: string = '';
+  quotedAvatarUrl: string = '';
 }

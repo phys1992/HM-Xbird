@@ -196,3 +196,11 @@ ArrowTS UI
 - 底部加载提示；
 - “我的”页恢复原生分栏开关，持久化；
 - 分栏关闭时展开态只显示单栏。
+
+
+## 13. 媒体与引用推文
+
+- `TweetItem` 增加视频、媒体类型、引用推文字段；
+- 解析 `extended_entities.media` 的 video/animated_gif，选择最高码率 mp4；
+- 解析 `quoted_status_result`，原生渲染引用推文卡片；
+- 视频暂时展示封面 + 播放标识，播放器下一阶段接入。

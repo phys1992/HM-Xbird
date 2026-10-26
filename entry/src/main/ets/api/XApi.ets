@@ -74,7 +74,7 @@ function parseUser(result: Record<string, Object> | null): TweetItem {
   return item;
 }
 
-function parseTweet(entry: Record<string, Object>): TweetItem | null {
+function parseTweet(entry: Record<string, Object>, depth: number = 0): TweetItem | null {
   const content = asObj(entry['content']);
   const itemContent = asObj(content == null ? null : content['itemContent']);
   const tweetResults = asObj(itemContent == null ? null : itemContent['tweet_results']);
@@ -100,8 +100,46 @@ function parseTweet(entry: Record<string, Object>): TweetItem | null {
   const media = asArr(extended == null ? null : extended['media']);
   if (media.length > 0) {
     const first = asObj(media[0]);
-    if (first != null && asString(first['type']) == 'photo') {
-      item.imageUrl = asString(first['media_url_https']);
+    if (first != null) {
+      const type = asString(first['type']);
+      item.mediaType = type;
+      if (type == 'photo') {
+        item.imageUrl = asString(first['media_url_https']);
+      } else if (type == 'video' || type == 'animated_gif') {
+        const videoInfo = asObj(first['video_info']);
+        const variants = asArr(videoInfo == null ? null : videoInfo['variants']);
+        let best = '';
+        let bestRate = -1;
+        for (const rawVariant of variants) {
+          const variant = asObj(rawVariant);
+          if (variant == null) continue;
+          const rate = asNumber(variant['bitrate']);
+          const vurl = asString(variant['url']);
+          if (vurl.length > 0 && rate >= bestRate) { best = vurl; bestRate = rate; }
+        }
+        item.videoUrl = best;
+        item.imageUrl = asString(first['media_url_https']);
+      }
+    }
+  }
+
+  if (depth < 1) {
+    let quoted = asObj(result['quoted_status_result']);
+    if (quoted == null) quoted = asObj(legacy['quoted_status_result']);
+    const quotedResult = asObj(quoted == null ? null : quoted['result']);
+    if (quotedResult != null) {
+      const tweetResults2: Record<string, Object> = { 'result': quotedResult };
+      const itemContent2: Record<string, Object> = { 'tweet_results': tweetResults2 };
+      const content2: Record<string, Object> = { 'itemContent': itemContent2 };
+      const synthetic: Record<string, Object> = { 'content': content2 };
+      const child = parseTweet(synthetic, depth + 1);
+      if (child != null) {
+        item.quotedId = child.id;
+        item.quotedText = child.text;
+        item.quotedAuthorName = child.authorName;
+        item.quotedAuthorHandle = child.authorHandle;
+        item.quotedAvatarUrl = child.avatarUrl;
+      }
     }
   }
   return item;

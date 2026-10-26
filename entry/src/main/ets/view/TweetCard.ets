@@ -83,9 +83,35 @@ export struct TweetCard {
           .onClick(() => this.onOpen(this.item))
 
         if (this.item.imageUrl.length > 0) {
-          Image(this.item.imageUrl).width('100%').aspectRatio(1.7)
-            .objectFit(ImageFit.Cover).borderRadius(12).margin({ top: 8 })
-            .onClick(() => this.onOpen(this.item))
+          Stack({ alignContent: Alignment.Center }) {
+            Image(this.item.imageUrl).width('100%').aspectRatio(1.7)
+              .objectFit(ImageFit.Cover).borderRadius(12)
+            if (this.item.videoUrl.length > 0) {
+              Circle({ width: 44, height: 44 }).fill('#99000000')
+              Text('▶').fontSize(18).fontColor('#FFFFFF')
+            }
+          }
+          .width('100%').margin({ top: 8 })
+          .onClick(() => this.onOpen(this.item))
+        }
+
+        if (this.item.quotedId.length > 0) {
+          Column() {
+            Row() {
+              if (this.item.quotedAvatarUrl.length > 0) {
+                Image(this.item.quotedAvatarUrl).width(22).height(22).borderRadius(11)
+              }
+              Text(this.item.quotedAuthorName).fontSize(13).fontWeight(FontWeight.Bold)
+                .margin({ left: 6 })
+              Text(`@${this.item.quotedAuthorHandle}`).fontSize(12).fontColor('#536471')
+                .margin({ left: 4 })
+            }.width('100%')
+            Text(this.item.quotedText).fontSize(13).lineHeight(18)
+              .maxLines(4).textOverflow({ overflow: TextOverflow.Ellipsis }).margin({ top: 4 })
+          }
+          .width('100%').padding(10).margin({ top: 8 })
+          .border({ width: 1, color: '#CFD9DE' }).borderRadius(12)
+          .alignItems(HorizontalAlign.Start)
         }
 
         Row() {
