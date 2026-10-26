@@ -56,6 +56,12 @@ function asString(value: Object | undefined | null): string {
   return '';
 }
 
+function asText(value: Object | undefined | null): string {
+  if (typeof value == 'string') return value as string;
+  if (typeof value == 'number') return `${value as number}`;
+  return '';
+}
+
 function asNumber(value: Object | undefined | null): number {
   if (typeof value == 'number') return value as number;
   return 0;
@@ -647,6 +653,14 @@ export class XApi {
   }
 
   static async notifications(cookie: string): Promise<NotificationItem[]> {
+    try {
+      return await XApi.notificationsGraphql(cookie);
+    } catch (e) {
+      return await XApi.notificationsRest(cookie);
+    }
+  }
+
+  private static async notificationsGraphql(cookie: string): Promise<NotificationItem[]> {
     let queryId = '';
     let operation = 'NotificationsTimeline';
     try {
@@ -767,6 +781,62 @@ export class XApi {
     profile.followers = asNumber(legacy['followers_count']);
     profile.following = asNumber(legacy['friends_count']);
     return profile;
+  }
+
+
+  private static async notificationsRest(cookie: string): Promise<NotificationItem[]> {
+    const url = 'https://x.com/i/api/1.1/notifications/all.json' +
+      '?count=20&tweet_mode=extended&include_entities=true';
+    const request = http.createHttp();
+    let text = '';
+    try {
+      const response = await request.request(url, {
+        method: http.RequestMethod.GET,
+        header: XApi.headers(cookie),
+        expectDataType: http.HttpDataType.STRING,
+        connectTimeout: 20000,
+        readTimeout: 20000
+      });
+      if (response.responseCode < 200 || response.responseCode >= 300) {
+        throw new Error(`HTTP ${response.responseCode}`);
+      }
+      text = response.result as string;
+    } finally {
+      request.destroy();
+    }
+    const root = asObj(JSON.parse(text) as Object);
+    const globalObjects = asObj(root == null ? null : root['globalObjects']);
+    const users = asObj(globalObjects == null ? null : globalObjects['users']);
+    const timeline = asObj(root == null ? null : root['timeline']);
+    const instructions = asArr(timeline == null ? null : timeline['instructions']);
+    const result: NotificationItem[] = [];
+    for (const rawInstruction of instructions) {
+      const instruction = asObj(rawInstruction);
+      if (instruction == null) continue;
+      const addEntries = asObj(instruction['addEntries']);
+      for (const rawEntry of asArr(addEntries == null ? null : addEntries['entries'])) {
+        const entry = asObj(rawEntry);
+        if (entry == null) continue;
+        const content = asObj(entry['content']);
+        const n = asObj(content == null ? null : content['notification']);
+        if (n == null) continue;
+        const item = new NotificationItem();
+        item.id = asText(n['id']);
+        item.type = asText(n['notification_type']);
+        item.message = asText(n['message']);
+        item.tweetId = asText(n['tweet_id']);
+        const fromId = asText(n['from_user_id']);
+        const user = asObj(users == null ? null : users[fromId]);
+        if (user != null) {
+          item.authorName = asText(user['name']);
+          item.authorHandle = asText(user['screen_name']);
+          item.avatarUrl = asText(user['profile_image_url_https']);
+        }
+        if (item.id.length > 0) result.push(item);
+      }
+    }
+    if (result.length == 0) throw new Error('通知为空（REST）');
+    return result;
   }
 
 }

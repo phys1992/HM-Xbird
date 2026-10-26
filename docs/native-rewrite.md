@@ -269,3 +269,12 @@ ArrowTS UI
 - 没有 JS 缓存时，For You 直接优先 REST `home_timeline`，避免等待 queryId 扫描；
 - REST 失败再走 GraphQL；
 - 详情已有 GraphQL + REST 双通道。
+
+
+## 22. 通知 REST 回退
+
+- `NotificationsTimeline` GraphQL 失败时回退 `1.1/notifications/all.json`；
+- 解析 `timeline.instructions.addEntries.notification`；
+- 支持数字 ID 转字符串；
+- 从 `globalObjects.users` 补全作者信息；
+- 通知与详情都不再单点依赖 queryId。
