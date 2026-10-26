@@ -114,13 +114,26 @@ export class QueryIds {
     }
 
     // 2. Scan bundles for `queryId:"..."` next to the operation name.
-    for (const url of urls) {
+    //    The authenticated entry bundle lazily imports chunk files; expand
+    //    those references so operations inside chunks are found too.
+    const queue: string[] = urls.slice();
+    for (let qi = 0; qi < queue.length && qi < 40; qi++) {
+      const url = queue[qi];
       const js = await QueryIds.fetchText(url, cookie);
       if (js.length == 0) continue;
       const id = QueryIds.extract(js, operation);
       if (id.length > 0) {
         QueryIds.cache.set(operation, id);
         return id;
+      }
+      const base = url.substring(0, url.lastIndexOf('/') + 1);
+      const chunkPattern = /(?:assets|static)\/[A-Za-z0-9_.-]+\.js/g;
+      let chunk = chunkPattern.exec(js);
+      while (chunk != null && queue.length < 40) {
+        const ref = chunk[0];
+        const absolute = ref.startsWith('http') ? ref : `${base}${ref}`;
+        if (queue.indexOf(absolute) < 0) queue.push(absolute);
+        chunk = chunkPattern.exec(js);
       }
     }
     // Known fallbacks for operations the native shell needs even when no

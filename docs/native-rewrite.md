@@ -245,3 +245,11 @@ ArrowTS UI
 - 底栏保持 320vp 悬浮胶囊、模糊、描边、阴影；
 - 我的页加载原生用户资料；
 - queryId 回退支持 UserByRestId。
+
+
+## 19. queryId 自动发现增强
+
+- 扫描已登录入口 bundle 时，递归展开 `assets/*.js` 懒加载 chunk；
+- 最多 40 个脚本，避免无限抓取；
+- 目标：纯 Cookie 登录时也能自动发现 HomeTimeline / SearchTimeline / TweetDetail 等 queryId；
+- 已知 queryId 仍作为最后回退。
