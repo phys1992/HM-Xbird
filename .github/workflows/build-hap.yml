@@ -71,13 +71,13 @@ jobs:
             -p product=default \
             -p buildMode=debug \
             --no-daemon
-          ls -lh entry/build/default/outputs/default/entry-default-unsigned.hap
+          ls -lh entry/build/default/outputs/default/tuichuang-0.1.0-unsigned.hap
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: tuichuang-hap
-          path: entry/build/default/outputs/default/entry-default-unsigned.hap
+          path: entry/build/default/outputs/default/tuichuang-0.1.0-unsigned.hap
           if-no-files-found: error
 
       - name: Create GitHub Release
@@ -86,7 +86,7 @@ jobs:
         with:
           name: tuichuang ${{ github.ref_name }}
           files: |
-            entry/build/default/outputs/default/entry-default-unsigned.hap
+            entry/build/default/outputs/default/tuichuang-0.1.0-unsigned.hap
             docs/tuichuang-user-guide.md
           fail_on_unmatched_files: false
           body: |
