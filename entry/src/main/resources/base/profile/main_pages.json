@@ -1,7 +1,5 @@
 {
   "src": [
-    "pages/Index",
-    "pages/DetailWindow",
-    "pages/BarWindow"
+    "pages/Index"
   ]
 }

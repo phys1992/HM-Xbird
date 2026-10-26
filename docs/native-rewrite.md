@@ -340,3 +340,12 @@ ArrowTS UI
 - 用户主页切换作者时通过 `@Prop @Watch` 重新加载；
 - 退出登录清空资料、帖子、通知、详情缓存和滚动偏移；
 - 避免切换账号后看到上一账号状态。
+
+
+## 31. 布局与入口清理
+
+- 底栏改为拖拽移动，松开后吸附左/中/右，不再点击全屏就移动；
+- `SideBarContainer` 用 `showSideBar` 切换单/双栏，折叠态详情不再依赖 0 宽侧栏；
+- `main_pages.json` 只保留 `pages/Index`；
+- EntryAbility 不再创建 Web 子窗口桥接；
+- 不再加载 DetailWindow / BarWindow。

@@ -596,9 +596,8 @@ export struct NativeShell {
             this.detailPane()
           }.width('100%').height('100%').padding({ bottom: 76 })
         }
-        .showSideBar(true)
-        .sideBarWidth(this.expanded && this.splitEnabled ? this.paneWidth * 0.5 :
-          (this.selected != null ? 0 : this.paneWidth))
+        .showSideBar(this.selected == null || (this.expanded && this.splitEnabled))
+        .sideBarWidth(this.expanded && this.splitEnabled ? this.paneWidth * 0.5 : this.paneWidth)
         .minSideBarWidth(1)
         .maxSideBarWidth(this.paneWidth)
         .minContentWidth(0)
@@ -622,7 +621,19 @@ export struct NativeShell {
         .width('100%').height(76)
         .padding({ left: this.barX })
         .justifyContent(FlexAlign.Center)
-        .hitTestBehavior(HitTestMode.Transparent)
+        .gesture(
+          PanGesture()
+            .onActionUpdate((event: GestureEvent) => {
+              if (!this.expanded) return;
+              this.barX = Math.max(8, Math.min(this.paneWidth - 328, this.barX + event.offsetX));
+            })
+            .onActionEnd(() => {
+              if (!this.expanded) return;
+              const third = this.paneWidth / 3;
+              const target = this.barX + 160 < third ? 0 : (this.barX + 160 > third * 2 ? 2 : 1);
+              this.moveBar(target);
+            })
+        )
 
         if (this.profileHandle.length > 0) {
           ProfilePage({
@@ -701,15 +712,5 @@ export struct NativeShell {
     }
     .width('100%').height('100%')
     .backgroundColor('#FFFFFF')
-    .onTouchIntercept((event: TouchEvent) => {
-      if (this.expanded && event.type == TouchType.Down && event.touches.length > 0) {
-        const x = event.touches[0].x;
-        const y = event.touches[0].y;
-        if (y < this.paneHeight - 110) {
-          this.moveBar(x < this.paneWidth / 2 ? 0 : 2);
-        }
-      }
-      return HitTestMode.Default;
-    })
   }
 }

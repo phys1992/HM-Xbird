@@ -1,6 +1,5 @@
 import { UIAbility, AbilityConstant } from '@kit.AbilityKit';
 import { window } from '@kit.ArkUI';
-import { WindowBridge } from '../model/WindowBridge';
 import { BackDispatcher } from '../model/BackDispatcher';
 
 export default class EntryAbility extends UIAbility {
@@ -14,7 +13,6 @@ export default class EntryAbility extends UIAbility {
   }
 
   onWindowStageCreate(windowStage: window.WindowStage): void {
-    WindowBridge.stage = windowStage;
     windowStage.loadContent('pages/Index');
   }
 }
