@@ -253,3 +253,11 @@ ArrowTS UI
 - 最多 40 个脚本，避免无限抓取；
 - 目标：纯 Cookie 登录时也能自动发现 HomeTimeline / SearchTimeline / TweetDetail 等 queryId；
 - 已知 queryId 仍作为最后回退。
+
+
+## 20. 详情 REST 回退
+
+- `TweetDetail` GraphQL 失败时回退 REST：
+  - `statuses/show.json` 取主推文；
+  - `2/timeline/conversation/<id>.json` 取评论；
+- 避免 queryId 变化导致详情完全不可用。

@@ -490,6 +490,14 @@ export class XApi {
 
 
   static async tweetDetail(cookie: string, tweetId: string): Promise<HomeResult> {
+    try {
+      return await XApi.tweetDetailGraphql(cookie, tweetId);
+    } catch (e) {
+      return await XApi.tweetDetailRest(cookie, tweetId);
+    }
+  }
+
+  private static async tweetDetailGraphql(cookie: string, tweetId: string): Promise<HomeResult> {
     const queryId = await QueryIds.resolve(cookie, 'TweetDetail');
     const variables: Record<string, Object> = {
       'focalTweetId': tweetId,
@@ -579,6 +587,55 @@ export class XApi {
     return result;
   }
 
+
+
+  private static async tweetDetailRest(cookie: string, tweetId: string): Promise<HomeResult> {
+    const request = http.createHttp();
+    const result = new HomeResult();
+    try {
+      const showUrl = `https://x.com/i/api/1.1/statuses/show.json?id=${encodeURIComponent(tweetId)}` +
+        `&tweet_mode=extended&include_entities=true`;
+      const response = await request.request(showUrl, {
+        method: http.RequestMethod.GET,
+        header: XApi.headers(cookie),
+        expectDataType: http.HttpDataType.STRING,
+        connectTimeout: 20000,
+        readTimeout: 20000
+      });
+      if (response.responseCode >= 200 && response.responseCode < 300) {
+        const focused = parseRestTweet(JSON.parse(response.result as string) as Object);
+        if (focused != null) result.tweets.push(focused);
+      }
+
+      const convUrl = `https://x.com/i/api/2/timeline/conversation/${encodeURIComponent(tweetId)}.json` +
+        `?count=20&tweet_mode=extended&include_entities=true`;
+      const conv = await request.request(convUrl, {
+        method: http.RequestMethod.GET,
+        header: XApi.headers(cookie),
+        expectDataType: http.HttpDataType.STRING,
+        connectTimeout: 20000,
+        readTimeout: 20000
+      });
+      if (conv.responseCode >= 200 && conv.responseCode < 300) {
+        const root = asObj(JSON.parse(conv.result as string) as Object);
+        const globalObjects = asObj(root == null ? null : root['globalObjects']);
+        const tweets = asObj(globalObjects == null ? null : globalObjects['tweets']);
+        if (tweets != null) {
+          for (const key of Object.keys(tweets)) {
+            const item = parseRestTweet(tweets[key] as Object);
+            if (item != null && item.id.length > 0 &&
+              !result.tweets.some((t: TweetItem) => t.id == item.id)) {
+              result.tweets.push(item);
+            }
+          }
+        }
+      }
+    } finally {
+      request.destroy();
+    }
+    if (result.tweets.length == 0) throw new Error('推文详情为空（REST）');
+    return result;
+  }
 
   static async notifications(cookie: string): Promise<NotificationItem[]> {
     let queryId = '';
