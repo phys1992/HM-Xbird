@@ -349,3 +349,10 @@ ArrowTS UI
 - `main_pages.json` 只保留 `pages/Index`；
 - EntryAbility 不再创建 Web 子窗口桥接；
 - 不再加载 DetailWindow / BarWindow。
+
+
+## 32. 返回栈与内存修正
+
+- 返回优先级：图片/视频 → 用户主页 → 发帖 → 详情 → Tab → 退出；
+- `onMemoryLevel` 直接清空 `DetailCache`，不再依赖 AppStorage 中转；
+- 移除无效的 `@Watch` 存储监听。

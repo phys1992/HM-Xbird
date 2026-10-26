@@ -1,11 +1,11 @@
 import { UIAbility, AbilityConstant } from '@kit.AbilityKit';
 import { window } from '@kit.ArkUI';
 import { BackDispatcher } from '../model/BackDispatcher';
+import { DetailCache } from '../model/DetailCache';
 
 export default class EntryAbility extends UIAbility {
   onMemoryLevel(level: AbilityConstant.MemoryLevel): void {
-    const tick = AppStorage.get<number>('memoryTrimTick') ?? 0;
-    AppStorage.setOrCreate('memoryTrimTick', tick + 1);
+    DetailCache.clear();
   }
 
   onBackPressed(): boolean {

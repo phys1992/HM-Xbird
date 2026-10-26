@@ -42,7 +42,6 @@ export struct NativeShell {
   @State profileHandle: string = '';
   @State sheenX: number = -120;
   private videoController: VideoController = new VideoController();
-  @StorageLink('memoryTrimTick') memoryTick: number = 0;
   @State expanded: boolean = false;
   @State selected: TweetItem | null = null;
   @State detailTweets: TweetItem[] = [];
@@ -88,16 +87,16 @@ export struct NativeShell {
   }
 
   private handleBack(): boolean {
-    if (this.profileHandle.length > 0) {
-      this.profileHandle = '';
-      return true;
-    }
     if (this.viewingImage.length > 0) {
       this.viewingImage = '';
       return true;
     }
     if (this.playingVideo.length > 0) {
       this.playingVideo = '';
+      return true;
+    }
+    if (this.profileHandle.length > 0) {
+      this.profileHandle = '';
       return true;
     }
     if (this.composing) {
@@ -195,10 +194,6 @@ export struct NativeShell {
     } finally {
       this.notificationsLoading = false;
     }
-  }
-
-  private onMemoryTrim(): void {
-    DetailCache.clear();
   }
 
   private openNotification(item: NotificationItem): void {
