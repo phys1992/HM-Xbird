@@ -4,6 +4,16 @@ tuichuang 是一个面向 HarmonyOS NEXT 的非官方 X（Twitter）客户端，
 
 > 本项目为非官方第三方客户端，与 X Corp. 无隶属或合作关系。X、Twitter 及相关标识归其各自权利人所有。
 
+## 原生重构分支
+
+`native-rewrite` 分支正在把 ArkWeb 封装重构为 ArkTS/ArkUI 原生实现。
+
+- 状态报告：[docs/native-rewrite-status.md](docs/native-rewrite-status.md)
+- 验证清单：[docs/native-rewrite-verification.md](docs/native-rewrite-verification.md)
+- 构建：`scripts/build-native.sh`
+
+稳定版仍为 `v0.1.0`，原生分支尚未替换正式版本。
+
 ## 用途
 
 - 在 HarmonyOS NEXT 设备上浏览 X 的时间线、推文、评论、搜索和通知；
