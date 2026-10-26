@@ -17,6 +17,7 @@ jobs:
       # (the zip that contains bin/, sdk/, tool/node/). Store it as a
       # repository secret; do not commit the SDK to this repository.
       DEVECO_CLI_URL: ${{ secrets.DEVECO_CLI_URL }}
+      DEVECO_CLI_URL_2: ${{ secrets.DEVECO_CLI_URL_2 }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -44,7 +45,13 @@ jobs:
             exit 1
           fi
           mkdir -p "$RUNNER_TEMP/deveco"
-          curl -fL --retry 3 "$DEVECO_CLI_URL" -o "$RUNNER_TEMP/deveco/cli.zip"
+          curl -fL --retry 3 "$DEVECO_CLI_URL" -o "$RUNNER_TEMP/deveco/cli.part0"
+          if [ -n "${DEVECO_CLI_URL_2}" ]; then
+            curl -fL --retry 3 "$DEVECO_CLI_URL_2" -o "$RUNNER_TEMP/deveco/cli.part1"
+            cat "$RUNNER_TEMP/deveco/cli.part0" "$RUNNER_TEMP/deveco/cli.part1" > "$RUNNER_TEMP/deveco/cli.zip"
+          else
+            mv "$RUNNER_TEMP/deveco/cli.part0" "$RUNNER_TEMP/deveco/cli.zip"
+          fi
           unzip -q "$RUNNER_TEMP/deveco/cli.zip" -d "$RUNNER_TEMP/deveco"
           CLI="$RUNNER_TEMP/deveco/command-line-tools"
           test -x "$CLI/bin/hvigorw"

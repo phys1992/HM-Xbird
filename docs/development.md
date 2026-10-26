@@ -55,6 +55,7 @@ hvigorw assembleHap --mode module -p module=entry@default \
 前置条件：
 
 1. 在仓库 Secrets 中添加 `DEVECO_CLI_URL`，指向 Huawei DevEco command-line-tools 的 zip 下载地址；
+   如果 SDK zip 超过 GitHub Release 单文件 2GiB 限制，拆成两部分分别上传，并额外添加 `DEVECO_CLI_URL_2`；
 2. zip 内需包含 `bin/`、`sdk/`、`tool/node/`；
 3. 不要把 SDK 提交到仓库；
 4. 构建产物为未签名 HAP，安装方式见 Release 说明。
