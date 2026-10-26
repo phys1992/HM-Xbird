@@ -33,6 +33,7 @@ export struct NativeShell {
   @State splitEnabled: boolean = true;
   @State playingVideo: string = '';
   @State viewingImage: string = '';
+  @State imageScale: number = 1;
   @State showWebLogin: boolean = false;
   @State sheenX: number = -120;
   private videoController: VideoController = new VideoController();
@@ -436,7 +437,7 @@ export struct NativeShell {
                     onReply: (value: TweetItem) => this.openReply(value),
                     onQuote: (value: TweetItem) => this.openQuote(value),
                     onPlay: (value: TweetItem) => this.playingVideo = value.videoUrl,
-                    onImage: (url: string) => this.viewingImage = url,
+                    onImage: (url: string) => { this.imageScale = 1; this.viewingImage = url; },
                     onOpenQuoted: (id: string) => this.openQuoted(id)
                   })
                   Divider().color('#EFF3F4')
@@ -469,7 +470,7 @@ export struct NativeShell {
           onOpen: (item: TweetItem) => this.openDetail(item),
           onPrefetch: (item: TweetItem) => this.prefetchDetail(item),
           onPlay: (item: TweetItem) => this.playingVideo = item.videoUrl,
-          onImage: (url: string) => this.viewingImage = url,
+          onImage: (url: string) => { this.imageScale = 1; this.viewingImage = url; },
           onOpenQuoted: (id: string) => this.openQuoted(id)
         })
       }.width('100%').height('100%')
@@ -482,7 +483,7 @@ export struct NativeShell {
           onQuote: (item: TweetItem) => this.openQuote(item),
           onOpen: (item: TweetItem) => this.openDetail(item),
           onPlay: (item: TweetItem) => this.playingVideo = item.videoUrl,
-          onImage: (url: string) => this.viewingImage = url,
+          onImage: (url: string) => { this.imageScale = 1; this.viewingImage = url; },
           onOpenQuoted: (id: string) => this.openQuoted(id)
         })
       }.width('100%').height('100%')
@@ -579,6 +580,14 @@ export struct NativeShell {
               .width('100%').height('100%')
               .objectFit(ImageFit.Contain)
               .backgroundColor('#000000')
+              .scale({ x: this.imageScale, y: this.imageScale })
+              .gesture(
+                PinchGesture()
+                  .onActionUpdate((event: GestureEvent) => {
+                    this.imageScale = Math.max(1, Math.min(4, event.scale));
+                  })
+              )
+              .onClick(() => { this.imageScale = 1; })
             Button('关闭')
               .margin({ top: 12, right: 12 })
               .backgroundColor('#99000000')
