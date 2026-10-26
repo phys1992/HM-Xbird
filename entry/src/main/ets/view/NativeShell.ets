@@ -42,7 +42,7 @@ export struct NativeShell {
   @State profileHandle: string = '';
   @State sheenX: number = -120;
   private videoController: VideoController = new VideoController();
-  @StorageLink('memoryTrimTick') @Watch('onMemoryTrim') memoryTick: number = 0;
+  @StorageLink('memoryTrimTick') memoryTick: number = 0;
   @State expanded: boolean = false;
   @State selected: TweetItem | null = null;
   @State detailTweets: TweetItem[] = [];
@@ -271,6 +271,14 @@ export struct NativeShell {
     this.loggedIn = false;
     this.selected = null;
     this.tab = 0;
+    this.profile = null;
+    this.myTweets = [];
+    this.notifications = [];
+    this.notificationsLoaded = false;
+    this.notificationsCursor = '';
+    this.detailTweets = [];
+    DetailCache.clear();
+    AppStorage.setOrCreate('tuichuang_home_offset', 0);
   }
 
   @Builder

@@ -6,7 +6,7 @@ import { TweetCard } from './TweetCard';
 @Component
 export struct ProfilePage {
   cookie: string = '';
-  handle: string = '';
+  @Prop @Watch('onHandleChanged') handle: string = '';
   onClose: () => void = () => {};
   onOpenTweet: (item: TweetItem) => void = () => {};
   onReply: (item: TweetItem) => void = () => {};
@@ -19,6 +19,12 @@ export struct ProfilePage {
   @State tweets: TweetItem[] = [];
   @State loading: boolean = true;
   @State error: string = '';
+
+  onHandleChanged(): void {
+    this.profile = null;
+    this.tweets = [];
+    this.load();
+  }
 
   aboutToAppear(): void {
     this.load();
