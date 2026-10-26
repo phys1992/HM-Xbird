@@ -26,6 +26,7 @@ export struct NativeShell {
   @State notificationsLoading: boolean = false;
   @State notificationsError: string = '';
   @State notificationsLoaded: boolean = false;
+  @State splitEnabled: boolean = true;
   @StorageLink('memoryTrimTick') @Watch('onMemoryTrim') memoryTick: number = 0;
   @State expanded: boolean = false;
   @State selected: TweetItem | null = null;
@@ -47,6 +48,7 @@ export struct NativeShell {
       this.cookie = saved;
       this.loggedIn = true;
     }
+    this.splitEnabled = SessionStore.loadSplitEnabled(context);
     try {
       this.expanded = display.getFoldStatus() == display.FoldStatus.FOLD_STATUS_EXPANDED;
       display.on('foldStatusChange', (status: number) => {
@@ -237,8 +239,15 @@ export struct NativeShell {
 
       Divider().color('#EFF3F4')
       Row() {
-        Text('分栏设置').fontSize(15).layoutWeight(1)
-        Text(this.expanded ? '当前已展开' : '折叠屏展开后启用').fontSize(12).fontColor('#536471')
+        Column() {
+          Text('启用分栏').fontSize(15)
+          Text(this.expanded ? '当前已展开' : '折叠屏展开后生效').fontSize(12).fontColor('#536471').margin({ top: 2 })
+        }.alignItems(HorizontalAlign.Start).layoutWeight(1)
+        Toggle({ type: ToggleType.Switch, isOn: this.splitEnabled })
+          .onChange((value: boolean) => {
+            this.splitEnabled = value;
+            SessionStore.saveSplitEnabled(getContext(this) as common.UIAbilityContext, value);
+          })
       }.width('100%').padding(16)
 
       Row() {
@@ -404,7 +413,7 @@ export struct NativeShell {
           }.width('100%').height('100%').padding({ bottom: 76 })
         }
         .showSideBar(true)
-        .sideBarWidth(this.expanded ? this.paneWidth * 0.5 :
+        .sideBarWidth(this.expanded && this.splitEnabled ? this.paneWidth * 0.5 :
           (this.selected != null ? 0 : this.paneWidth))
         .minSideBarWidth(1)
         .maxSideBarWidth(this.paneWidth)

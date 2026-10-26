@@ -14,6 +14,8 @@ export struct HomeFeed {
   @State loading: boolean = false;
   @State error: string = '';
   @State notice: string = '';
+  @State cursor: string = '';
+  @State refreshing: boolean = false;
 
   aboutToAppear(): void {
     this.load(false);
@@ -25,17 +27,19 @@ export struct HomeFeed {
     this.error = '';
     try {
       let page: HomeResult;
+      const cursor = more ? this.cursor : '';
       if (this.tab == 0) {
         try {
-          page = await XApi.forYou(this.cookie, '');
+          page = await XApi.forYou(this.cookie, cursor);
         } catch (e) {
           this.notice = '“为你推荐”接口不可用，已回退到关注时间线';
-          page = await XApi.homeLatest(this.cookie, '');
+          page = await XApi.homeLatest(this.cookie, cursor);
         }
       } else {
-        page = await XApi.homeLatest(this.cookie, '');
+        page = await XApi.homeLatest(this.cookie, cursor);
       }
       this.tweets = more ? this.tweets.concat(page.tweets) : page.tweets;
+      this.cursor = page.cursor;
       if (!more) {
         for (let i = 0; i < this.tweets.length && i < 3; i++) {
           this.onPrefetch(this.tweets[i]);
@@ -52,6 +56,7 @@ export struct HomeFeed {
     if (this.tab == index) return;
     this.tab = index;
     this.tweets = [];
+    this.cursor = '';
     this.notice = '';
     this.load(false);
   }
@@ -116,9 +121,18 @@ export struct HomeFeed {
               }
             }
           }, (item: TweetItem) => item.id)
+
+          ListItem() {
+            Row() {
+              LoadingProgress().width(18).height(18)
+              Text('加载更多…').fontSize(12).fontColor('#536471').margin({ left: 6 })
+            }.width('100%').justifyContent(FlexAlign.Center).padding(12)
+          }
         }
         .layoutWeight(1).width('100%')
-        .onReachEnd(() => this.load(true))
+        .onReachEnd(() => {
+          if (!this.loading && this.cursor.length > 0) this.load(true);
+        })
       }
     }
     .width('100%').height('100%')

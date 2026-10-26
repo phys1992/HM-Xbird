@@ -6,6 +6,7 @@ const KEY_COOKIE = 'cookie';
 const KEY_HANDLE = 'handle';
 const KEY_JS_URLS = 'js_urls';
 const KEY_SPLIT_RATIO = 'split_ratio';
+const KEY_SPLIT_ENABLED = 'split_enabled';
 
 export class SessionStore {
   private static store: preferences.Preferences | null = null;
@@ -47,6 +48,17 @@ export class SessionStore {
     const value = SessionStore.getStore(context).getSync(KEY_SPLIT_RATIO, 0.5);
     if (typeof value == 'number') return value as number;
     return 0.5;
+  }
+
+  static saveSplitEnabled(context: common.UIAbilityContext, enabled: boolean): void {
+    const store = SessionStore.getStore(context);
+    store.putSync(KEY_SPLIT_ENABLED, enabled);
+    store.flush();
+  }
+
+  static loadSplitEnabled(context: common.UIAbilityContext): boolean {
+    const value = SessionStore.getStore(context).getSync(KEY_SPLIT_ENABLED, true);
+    return typeof value == 'boolean' ? value as boolean : true;
   }
 
   static clear(context: common.UIAbilityContext): void {
