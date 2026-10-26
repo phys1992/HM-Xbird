@@ -1,6 +1,6 @@
-# X Harmony
+# tuichuang
 
-X Harmony 是一个面向 HarmonyOS NEXT 的非官方 X（Twitter）客户端，重点适配华为折叠屏手机。它把 X 网页的完整功能与 HarmonyOS 的原生交互结合起来，在折叠屏展开时提供左右分栏，折叠时保持单栏浏览。
+tuichuang 是一个面向 HarmonyOS NEXT 的非官方 X（Twitter）客户端，重点适配华为折叠屏手机。它把 X 网页的完整功能与 HarmonyOS 的原生交互结合起来，在折叠屏展开时提供左右分栏，折叠时保持单栏浏览。
 
 > 本项目为非官方第三方客户端，与 X Corp. 无隶属或合作关系。X、Twitter 及相关标识归其各自权利人所有。
 
@@ -43,7 +43,7 @@ X Harmony 是一个面向 HarmonyOS NEXT 的非官方 X（Twitter）客户端，
 2. 使用 **小白调试助手** 安装到 HarmonyOS NEXT 设备：
    - 项目地址：<https://github.com/likuai2010/auto-installer>
    - 具体安装步骤、设备要求和签名说明，请以该项目文档为准；
-3. 安装完成后，在设备桌面找到 **X Harmony** 并打开，登录 X 账号即可使用。
+3. 安装完成后，在设备桌面找到 **tuichuang** 并打开，登录 X 账号即可使用。
 
 > 说明：Release 中的 HAP 为未签名构建，安装时可能需要按小白调试助手的指引完成签名或开发者模式配置。请只在可信设备上安装。
 

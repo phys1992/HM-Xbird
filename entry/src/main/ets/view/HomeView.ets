@@ -104,7 +104,7 @@ export struct HomeView {
   build() {
     Column() {
       Row() {
-        Text('X Harmony')
+        Text('tuichuang')
           .fontSize(20)
           .fontWeight(FontWeight.Bold)
           .layoutWeight(1)

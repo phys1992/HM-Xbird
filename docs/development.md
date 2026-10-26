@@ -1,4 +1,4 @@
-# X Harmony（ArkTS 原生，B 方案）
+# tuichuang（ArkTS 原生，B 方案）
 
 不依赖 Flutter 的纯 ArkTS 客户端。当前完成第一里程碑：
 

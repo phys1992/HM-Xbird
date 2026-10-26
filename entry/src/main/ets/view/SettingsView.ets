@@ -85,7 +85,7 @@ export struct SettingsView {
         Text('语言跟随系统。').fontSize(14).fontColor('#666666').padding(16)
       } else {
         Column() {
-          Text('X Harmony').fontSize(16).fontWeight(FontWeight.Bold)
+          Text('tuichuang').fontSize(16).fontWeight(FontWeight.Bold)
           Text('版本 0.1.0').fontSize(13).fontColor('#999999').margin({ top: 6 })
           Text('基于 ArkWeb 的 X 客户端').fontSize(13).fontColor('#999999').margin({ top: 4 })
         }.width('100%').alignItems(HorizontalAlign.Start).padding(16)

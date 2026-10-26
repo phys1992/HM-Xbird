@@ -68,7 +68,7 @@ export struct MainView {
       Row() {
         Circle({ width: 48, height: 48 }).fill('#1D9BF0')
         Column() {
-          Text('X Harmony').fontSize(16).fontWeight(FontWeight.Bold)
+          Text('tuichuang').fontSize(16).fontWeight(FontWeight.Bold)
           Text('@signed_in').fontSize(13).fontColor('#536471')
           Row() {
             Text('— Following').fontSize(12).fontColor('#536471')

@@ -76,7 +76,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: x-harmony-hap
+          name: tuichuang-hap
           path: entry/build/default/outputs/default/entry-default-unsigned.hap
           if-no-files-found: error
 
@@ -84,10 +84,10 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          name: X Harmony ${{ github.ref_name }}
+          name: tuichuang ${{ github.ref_name }}
           files: |
             entry/build/default/outputs/default/entry-default-unsigned.hap
-            releases/0.1.0-user-guide.md
+            docs/tuichuang-user-guide.md
           fail_on_unmatched_files: false
           body: |
             HarmonyOS NEXT HAP (unsigned).
