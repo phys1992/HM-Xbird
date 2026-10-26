@@ -1,0 +1,89 @@
+name: Build HAP
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      # Required: a direct download URL for Huawei DevEco command-line-tools
+      # (the zip that contains bin/, sdk/, tool/node/). Store it as a
+      # repository secret; do not commit the SDK to this repository.
+      DEVECO_CLI_URL: ${{ secrets.DEVECO_CLI_URL }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare version
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          python3 - "$VERSION" <<'PY'
+          import re, sys
+          version = sys.argv[1]
+          path = 'AppScope/app.json5'
+          s = open(path, encoding='utf-8').read()
+          s = re.sub(r'"versionName"\s*:\s*"[^"]*"', f'"versionName": "{version}"', s)
+          open(path, 'w', encoding='utf-8').write(s)
+          print(f'versionName -> {version}')
+          PY
+
+      - name: Install DevEco command-line tools
+        run: |
+          set -euo pipefail
+          if [ -z "${DEVECO_CLI_URL}" ]; then
+            echo "::error::Missing secret DEVECO_CLI_URL"
+            echo "Upload the Huawei DevEco command-line-tools zip somewhere accessible and add its URL as the DEVECO_CLI_URL repository secret."
+            exit 1
+          fi
+          mkdir -p "$RUNNER_TEMP/deveco"
+          curl -fL --retry 3 "$DEVECO_CLI_URL" -o "$RUNNER_TEMP/deveco/cli.zip"
+          unzip -q "$RUNNER_TEMP/deveco/cli.zip" -d "$RUNNER_TEMP/deveco"
+          CLI="$RUNNER_TEMP/deveco/command-line-tools"
+          test -x "$CLI/bin/hvigorw"
+          echo "CLI=$CLI" >> "$GITHUB_ENV"
+          echo "DEVECO_SDK_HOME=$CLI/sdk" >> "$GITHUB_ENV"
+          echo "$CLI/bin" >> "$GITHUB_PATH"
+          echo "$CLI/tool/node/bin" >> "$GITHUB_PATH"
+          echo "$CLI/sdk/default/openharmony/toolchains" >> "$GITHUB_PATH"
+
+      - name: Build HAP
+        run: |
+          set -euo pipefail
+          chmod +x "$CLI/bin/hvigorw" || true
+          hvigorw assembleHap \
+            --mode module \
+            -p module=entry@default \
+            -p product=default \
+            -p buildMode=debug \
+            --no-daemon
+          ls -lh entry/build/default/outputs/default/entry-default-unsigned.hap
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: x-harmony-hap
+          path: entry/build/default/outputs/default/entry-default-unsigned.hap
+          if-no-files-found: error
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: X Harmony ${{ github.ref_name }}
+          files: |
+            entry/build/default/outputs/default/entry-default-unsigned.hap
+            releases/0.1.0-user-guide.md
+          fail_on_unmatched_files: false
+          body: |
+            HarmonyOS NEXT HAP (unsigned).
+
+            安装方法：下载 HAP 后使用小白调试助手安装，详见
+            https://github.com/likuai2010/auto-installer

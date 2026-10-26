@@ -41,3 +41,22 @@ hvigorw assembleHap --mode module -p module=entry@default \
 4. 点赞、转推、发推、回复、引用（移植 Dart 的写接口逻辑）；
 5. `x-client-transaction-id` 的 ArkTS 移植；
 6. 折叠屏双栏、Mate X7 悬停。
+
+
+## GitHub Actions
+
+`.github/workflows/build-hap.yml` 会在：
+
+- 手动触发（workflow_dispatch）；
+- 推送 `v*` tag；
+
+时构建 HAP，并在 tag 构建时创建 GitHub Release。
+
+前置条件：
+
+1. 在仓库 Secrets 中添加 `DEVECO_CLI_URL`，指向 Huawei DevEco command-line-tools 的 zip 下载地址；
+2. zip 内需包含 `bin/`、`sdk/`、`tool/node/`；
+3. 不要把 SDK 提交到仓库；
+4. 构建产物为未签名 HAP，安装方式见 Release 说明。
+
+版本号会在 tag 构建时自动写入 `AppScope/app.json5` 的 `versionName`。
