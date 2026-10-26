@@ -43,21 +43,15 @@ hvigorw assembleHap --mode module -p module=entry@default \
 6. 折叠屏双栏、Mate X7 悬停。
 
 
-## GitHub Actions
+## 本地构建与发布
 
-`.github/workflows/build-hap.yml` 会在：
+本项目不使用在线 CI，发布产物在本地编译后手动上传 GitHub Release：
 
-- 手动触发（workflow_dispatch）；
-- 推送 `v*` tag；
+```bash
+hvigorw assembleHap --mode module -p module=entry@default   -p product=default -p buildMode=debug --no-daemon
 
-时构建 HAP，并在 tag 构建时创建 GitHub Release。
+cp entry/build/default/outputs/default/tuichuang-unsigned.hap    build-out/tuichuang-<version>-unsigned.hap
+```
 
-前置条件：
+然后在 GitHub 仓库的 Releases 页面手动上传 HAP 和用户说明。
 
-1. 在仓库 Secrets 中添加 `DEVECO_CLI_URL`，指向 Huawei DevEco command-line-tools 的 zip 下载地址；
-   如果 SDK zip 超过 GitHub Release 单文件 2GiB 限制，拆成两部分分别上传，并额外添加 `DEVECO_CLI_URL_2`；
-2. zip 内需包含 `bin/`、`sdk/`、`tool/node/`；
-3. 不要把 SDK 提交到仓库；
-4. 构建产物为未签名 HAP，安装方式见 Release 说明。
-
-版本号会在 tag 构建时自动写入 `AppScope/app.json5` 的 `versionName`。
