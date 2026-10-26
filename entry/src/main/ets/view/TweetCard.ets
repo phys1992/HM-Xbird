@@ -9,6 +9,7 @@ export struct TweetCard {
   onReply: (item: TweetItem) => void = () => {};
   onQuote: (item: TweetItem) => void = () => {};
   onOpen: (item: TweetItem) => void = () => {};
+  onPlay: (item: TweetItem) => void = () => {};
   @State liked: boolean = false;
   @State retweeted: boolean = false;
   @State likeCount: number = 0;
@@ -92,7 +93,10 @@ export struct TweetCard {
             }
           }
           .width('100%').margin({ top: 8 })
-          .onClick(() => this.onOpen(this.item))
+          .onClick(() => {
+            if (this.item.videoUrl.length > 0) this.onPlay(this.item);
+            else this.onOpen(this.item);
+          })
         }
 
         if (this.item.quotedId.length > 0) {

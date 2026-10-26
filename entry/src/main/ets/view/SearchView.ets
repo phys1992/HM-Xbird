@@ -8,6 +8,7 @@ export struct SearchView {
   onReply: (item: TweetItem) => void = () => {};
   onQuote: (item: TweetItem) => void = () => {};
   onOpen: (item: TweetItem) => void = () => {};
+  onPlay: (item: TweetItem) => void = () => {};
   @State query: string = '';
   @State tweets: TweetItem[] = [];
   @State loading: boolean = false;
@@ -64,7 +65,8 @@ export struct SearchView {
                   cookie: this.cookie,
                   onReply: (value: TweetItem) => this.onReply(value),
                   onQuote: (value: TweetItem) => this.onQuote(value),
-                  onOpen: (value: TweetItem) => this.onOpen(value)
+                  onOpen: (value: TweetItem) => this.onOpen(value),
+                  onPlay: (value: TweetItem) => this.onPlay(value)
                 })
                 Divider().color('#EFF3F4')
               }

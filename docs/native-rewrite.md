@@ -204,3 +204,12 @@ ArrowTS UI
 - 解析 `extended_entities.media` 的 video/animated_gif，选择最高码率 mp4；
 - 解析 `quoted_status_result`，原生渲染引用推文卡片；
 - 视频暂时展示封面 + 播放标识，播放器下一阶段接入。
+
+
+## 14. 原生视频
+
+- 列表视频封面点击进入全屏播放；
+- 使用 ArkUI `Video` 组件 + `VideoController`；
+- 支持 HLS/MP4 直链、自动播放、系统控件；
+- 详情页视频同样可播放；
+- 返回键优先关闭播放器。

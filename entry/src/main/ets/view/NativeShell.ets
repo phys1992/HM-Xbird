@@ -27,6 +27,8 @@ export struct NativeShell {
   @State notificationsError: string = '';
   @State notificationsLoaded: boolean = false;
   @State splitEnabled: boolean = true;
+  @State playingVideo: string = '';
+  private videoController: VideoController = new VideoController();
   @StorageLink('memoryTrimTick') @Watch('onMemoryTrim') memoryTick: number = 0;
   @State expanded: boolean = false;
   @State selected: TweetItem | null = null;
@@ -64,6 +66,10 @@ export struct NativeShell {
   }
 
   private handleBack(): boolean {
+    if (this.playingVideo.length > 0) {
+      this.playingVideo = '';
+      return true;
+    }
     if (this.composing) {
       this.composing = false;
       return true;
@@ -337,7 +343,8 @@ export struct NativeShell {
                     item: item,
                     cookie: this.cookie,
                     onReply: (value: TweetItem) => this.openReply(value),
-                    onQuote: (value: TweetItem) => this.openQuote(value)
+                    onQuote: (value: TweetItem) => this.openQuote(value),
+                    onPlay: (value: TweetItem) => this.playingVideo = value.videoUrl
                   })
                   Divider().color('#EFF3F4')
                 }
@@ -367,7 +374,8 @@ export struct NativeShell {
           onReply: (item: TweetItem) => this.openReply(item),
           onQuote: (item: TweetItem) => this.openQuote(item),
           onOpen: (item: TweetItem) => this.openDetail(item),
-          onPrefetch: (item: TweetItem) => this.prefetchDetail(item)
+          onPrefetch: (item: TweetItem) => this.prefetchDetail(item),
+          onPlay: (item: TweetItem) => this.playingVideo = item.videoUrl
         })
       }.width('100%').height('100%')
       .visibility(this.tab == 0 ? Visibility.Visible : Visibility.None)
@@ -377,7 +385,8 @@ export struct NativeShell {
           cookie: this.cookie,
           onReply: (item: TweetItem) => this.openReply(item),
           onQuote: (item: TweetItem) => this.openQuote(item),
-          onOpen: (item: TweetItem) => this.openDetail(item)
+          onOpen: (item: TweetItem) => this.openDetail(item),
+          onPlay: (item: TweetItem) => this.playingVideo = item.videoUrl
         })
       }.width('100%').height('100%')
       .visibility(this.tab == 1 ? Visibility.Visible : Visibility.None)
@@ -451,6 +460,27 @@ export struct NativeShell {
             onClose: () => this.composing = false
           })
           .width('100%').height('100%')
+        }
+
+        if (this.playingVideo.length > 0) {
+          Stack({ alignContent: Alignment.TopEnd }) {
+            Video({
+              src: this.playingVideo,
+              controller: this.videoController
+            })
+              .width('100%').height('100%')
+              .objectFit(ImageFit.Contain)
+              .autoPlay(true)
+              .controls(true)
+              .backgroundColor('#000000')
+            Button('关闭')
+              .margin({ top: 12, right: 12 })
+              .backgroundColor('#99000000')
+              .fontColor('#FFFFFF')
+              .onClick(() => this.playingVideo = '')
+          }
+          .width('100%').height('100%')
+          .backgroundColor('#000000')
         }
       }
     }
