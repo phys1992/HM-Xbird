@@ -17,10 +17,10 @@ PY
 
 rm -rf "$WORK"
 mkdir -p "$WORK"
-cp -a "$ROOT/." "$WORK/"
+tar --exclude=./.git --exclude=./build --exclude=./build-out --exclude=./releases --exclude=./oh_modules --exclude=./.hvigor -C "$ROOT" -cf - . | tar -C "$WORK" -xf -
 cd "$WORK"
 
-export HOME="${HOME:-/tmp/tuichuang-build-home}"
+export HOME="${NATIVE_BUILD_HOME:-/tmp/tuichuang-build-home}"
 mkdir -p "$HOME"
 export DEVECO_SDK_HOME="$CLI/sdk"
 export PATH="$CLI/bin:$CLI/tool/node/bin:$CLI/sdk/default/openharmony/toolchains:$PATH"
