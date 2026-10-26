@@ -73,6 +73,15 @@ export class QueryIds {
     const cached = QueryIds.cache.get(operation);
     if (cached != undefined && cached.length > 0) return cached;
 
+    if (QueryIds.bundleUrls.length == 0) {
+      const earlyFallback: Map<string, string> = new Map();
+      earlyFallback.set('CreateTweet', 'uY34Pldm6W89yqswRmPMSQ');
+      earlyFallback.set('TweetDetail', 'wjV7NuWEsHgTBFfW3zYKzQ');
+      earlyFallback.set('SearchTimeline', 'BYppgupFFS2yqVmmRNjlsw');
+      const early = earlyFallback.get(operation);
+      if (early != undefined) return early;
+    }
+
     // 0. Best case: the document-start hook captured the real GraphQL URL,
     //    e.g. /i/api/graphql/<queryId>/HomeLatestTimeline?...
     for (const captured of QueryIds.bundleUrls) {
@@ -113,9 +122,14 @@ export class QueryIds {
         return id;
       }
     }
-    if (operation == 'CreateTweet') {
-      return 'uY34Pldm6W89yqswRmPMSQ';
-    }
+    // Known fallbacks for operations the native shell needs even when no
+    // authenticated WebView bundle has been captured yet.
+    const fallback: Map<string, string> = new Map();
+    fallback.set('CreateTweet', 'uY34Pldm6W89yqswRmPMSQ');
+    fallback.set('TweetDetail', 'wjV7NuWEsHgTBFfW3zYKzQ');
+    fallback.set('SearchTimeline', 'BYppgupFFS2yqVmmRNjlsw');
+    const known = fallback.get(operation);
+    if (known != undefined) return known;
     throw new Error(`无法解析 ${operation} 的 queryId（已扫描 ${urls.length} 个脚本）`);
   }
 }

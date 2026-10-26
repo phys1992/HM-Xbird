@@ -222,3 +222,10 @@ ArrowTS UI
 - 图片点击进入原生全屏查看器，返回关闭；
 - 视频点击进入原生播放器；
 - 列表滚动索引写入 AppStorage，重新加载后恢复大致位置。
+
+
+## 16. queryId 回退
+
+- 无网页登录缓存时，`TweetDetail` / `SearchTimeline` / `CreateTweet` 使用已知 queryId 回退；
+- 有网页登录抓取时仍优先使用实时 queryId；
+- 减少纯 Cookie 登录后的首次失败等待。
