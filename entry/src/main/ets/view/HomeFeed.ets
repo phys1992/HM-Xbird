@@ -8,6 +8,7 @@ export struct HomeFeed {
   onReply: (item: TweetItem) => void = () => {};
   onQuote: (item: TweetItem) => void = () => {};
   onOpen: (item: TweetItem) => void = () => {};
+  onPrefetch: (item: TweetItem) => void = () => {};
   @State tab: number = 0;
   @State tweets: TweetItem[] = [];
   @State loading: boolean = false;
@@ -35,6 +36,11 @@ export struct HomeFeed {
         page = await XApi.homeLatest(this.cookie, '');
       }
       this.tweets = more ? this.tweets.concat(page.tweets) : page.tweets;
+      if (!more) {
+        for (let i = 0; i < this.tweets.length && i < 3; i++) {
+          this.onPrefetch(this.tweets[i]);
+        }
+      }
     } catch (e) {
       this.error = `${e}`;
     } finally {

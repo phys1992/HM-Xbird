@@ -8,6 +8,7 @@ import { LoginView } from './LoginView';
 import { HomeFeed } from './HomeFeed';
 import { SearchView } from './SearchView';
 import { XApi } from '../api/XApi';
+import { DetailCache } from '../model/DetailCache';
 import { TweetCard } from './TweetCard';
 import { ComposeView } from './ComposeView';
 
@@ -17,6 +18,9 @@ export struct NativeShell {
   @State loggedIn: boolean = false;
   @State tab: number = 0;
   @State paneWidth: number = 360;
+  @State paneHeight: number = 800;
+  @State barMode: number = 1;
+  @State barX: number = 20;
   @State expanded: boolean = false;
   @State selected: TweetItem | null = null;
   @State detailTweets: TweetItem[] = [];
@@ -69,19 +73,51 @@ export struct NativeShell {
     return false;
   }
 
+  private updateBarX(): void {
+    const mode = this.expanded ? this.barMode : 1;
+    let x = (this.paneWidth - 320) / 2;
+    if (mode == 0) x = 10;
+    if (mode == 2) x = this.paneWidth - 330;
+    this.barX = Math.max(8, x);
+  }
+
+  private moveBar(target: number): void {
+    if (!this.expanded || target == this.barMode) return;
+    animateTo({ duration: 300, curve: Curve.Friction }, () => {
+      this.barMode = target;
+      this.updateBarX();
+    });
+  }
+
   private async openDetail(item: TweetItem): Promise<void> {
     this.selected = item;
+    this.detailError = '';
+    const cached = DetailCache.get(item.id);
+    if (cached != null) {
+      this.detailTweets = cached;
+      this.detailLoading = false;
+      return;
+    }
     this.detailTweets = [item];
     this.detailLoading = true;
-    this.detailError = '';
     try {
       const page = await XApi.tweetDetail(this.cookie, item.id);
-      if (page.tweets.length > 0) this.detailTweets = page.tweets;
+      if (page.tweets.length > 0) {
+        this.detailTweets = page.tweets;
+        DetailCache.put(item.id, page.tweets);
+      }
     } catch (e) {
       this.detailError = `${e}`;
     } finally {
       this.detailLoading = false;
     }
+  }
+
+  private prefetchDetail(item: TweetItem): void {
+    if (DetailCache.get(item.id) != null) return;
+    XApi.tweetDetail(this.cookie, item.id).then((page) => {
+      if (page.tweets.length > 0) DetailCache.put(item.id, page.tweets);
+    }).catch(() => {});
   }
 
   private openReply(item: TweetItem): void {
@@ -145,8 +181,10 @@ export struct NativeShell {
       this.navItem(3, $r('app.media.ic_user'), '我的')
     }
     .width(320).height(60).borderRadius(30)
-    .backgroundColor('#F2FFFFFF')
-    .shadow({ radius: 16, color: '#1A000000', offsetY: 4 })
+    .backgroundColor('#CCFFFFFF')
+    .backgroundBlurStyle(BlurStyle.Thick)
+    .border({ width: 1, color: '#99FFFFFF' })
+    .shadow({ radius: 18, color: '#26000000', offsetY: 5 })
     .padding({ left: 6, right: 6 })
     .margin({ bottom: 12 })
   }
@@ -239,26 +277,35 @@ export struct NativeShell {
   }
 
   @Builder
-  contentPage() {
-    if (this.tab == 0) {
-      HomeFeed({
-        cookie: this.cookie,
-        onReply: (item: TweetItem) => this.openReply(item),
-        onQuote: (item: TweetItem) => this.openQuote(item),
-        onOpen: (item: TweetItem) => this.openDetail(item)
-      })
-    } else if (this.tab == 1) {
-      SearchView({
-        cookie: this.cookie,
-        onReply: (item: TweetItem) => this.openReply(item),
-        onQuote: (item: TweetItem) => this.openQuote(item),
-        onOpen: (item: TweetItem) => this.openDetail(item)
-      })
-    } else if (this.tab == 2) {
-      this.notificationsPage()
-    } else {
-      this.mePage()
-    }
+  contentStack() {
+    Stack() {
+      Column() {
+        HomeFeed({
+          cookie: this.cookie,
+          onReply: (item: TweetItem) => this.openReply(item),
+          onQuote: (item: TweetItem) => this.openQuote(item),
+          onOpen: (item: TweetItem) => this.openDetail(item),
+          onPrefetch: (item: TweetItem) => this.prefetchDetail(item)
+        })
+      }.width('100%').height('100%')
+      .visibility(this.tab == 0 ? Visibility.Visible : Visibility.None)
+
+      Column() {
+        SearchView({
+          cookie: this.cookie,
+          onReply: (item: TweetItem) => this.openReply(item),
+          onQuote: (item: TweetItem) => this.openQuote(item),
+          onOpen: (item: TweetItem) => this.openDetail(item)
+        })
+      }.width('100%').height('100%')
+      .visibility(this.tab == 1 ? Visibility.Visible : Visibility.None)
+
+      Column() { this.notificationsPage() }.width('100%').height('100%')
+      .visibility(this.tab == 2 ? Visibility.Visible : Visibility.None)
+
+      Column() { this.mePage() }.width('100%').height('100%')
+      .visibility(this.tab == 3 ? Visibility.Visible : Visibility.None)
+    }.width('100%').height('100%')
   }
 
   build() {
@@ -276,7 +323,7 @@ export struct NativeShell {
       } else {
         SideBarContainer(SideBarContainerType.Embed) {
           Column() {
-            this.contentPage()
+            this.contentStack()
           }.width('100%').height('100%').padding({ bottom: 76 })
 
           Column() {
@@ -294,16 +341,20 @@ export struct NativeShell {
         .width('100%').height('100%')
         .onAreaChange((oldValue: Area, newValue: Area) => {
           const w = parseFloat(`${newValue.width}`);
+          const h = parseFloat(`${newValue.height}`);
           if (!isNaN(w)) {
             this.paneWidth = w;
-            this.expanded = w >= 600;
+            if (!this.expanded) this.barMode = 1;
+            this.updateBarX();
           }
+          if (!isNaN(h)) this.paneHeight = h;
         })
 
         Column() {
           this.bottomBar()
         }
         .width('100%').height(76)
+        .padding({ left: this.barX })
         .justifyContent(FlexAlign.Center)
         .hitTestBehavior(HitTestMode.Transparent)
 
@@ -323,5 +374,15 @@ export struct NativeShell {
     }
     .width('100%').height('100%')
     .backgroundColor('#FFFFFF')
+    .onTouchIntercept((event: TouchEvent) => {
+      if (this.expanded && event.type == TouchType.Down && event.touches.length > 0) {
+        const x = event.touches[0].x;
+        const y = event.touches[0].y;
+        if (y < this.paneHeight - 110) {
+          this.moveBar(x < this.paneWidth / 2 ? 0 : 2);
+        }
+      }
+      return HitTestMode.Default;
+    })
   }
 }
