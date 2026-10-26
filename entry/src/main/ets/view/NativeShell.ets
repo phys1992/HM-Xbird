@@ -5,6 +5,7 @@ import { TweetItem } from '../model/TweetItem';
 import { SessionStore } from '../model/SessionStore';
 import { BackDispatcher } from '../model/BackDispatcher';
 import { LoginView } from './LoginView';
+import { NativeLogin } from './NativeLogin';
 import { HomeFeed } from './HomeFeed';
 import { SearchView } from './SearchView';
 import { XApi } from '../api/XApi';
@@ -28,6 +29,8 @@ export struct NativeShell {
   @State notificationsLoaded: boolean = false;
   @State splitEnabled: boolean = true;
   @State playingVideo: string = '';
+  @State viewingImage: string = '';
+  @State showWebLogin: boolean = false;
   private videoController: VideoController = new VideoController();
   @StorageLink('memoryTrimTick') @Watch('onMemoryTrim') memoryTick: number = 0;
   @State expanded: boolean = false;
@@ -66,6 +69,10 @@ export struct NativeShell {
   }
 
   private handleBack(): boolean {
+    if (this.viewingImage.length > 0) {
+      this.viewingImage = '';
+      return true;
+    }
     if (this.playingVideo.length > 0) {
       this.playingVideo = '';
       return true;
@@ -344,7 +351,8 @@ export struct NativeShell {
                     cookie: this.cookie,
                     onReply: (value: TweetItem) => this.openReply(value),
                     onQuote: (value: TweetItem) => this.openQuote(value),
-                    onPlay: (value: TweetItem) => this.playingVideo = value.videoUrl
+                    onPlay: (value: TweetItem) => this.playingVideo = value.videoUrl,
+                    onImage: (url: string) => this.viewingImage = url
                   })
                   Divider().color('#EFF3F4')
                 }
@@ -375,7 +383,8 @@ export struct NativeShell {
           onQuote: (item: TweetItem) => this.openQuote(item),
           onOpen: (item: TweetItem) => this.openDetail(item),
           onPrefetch: (item: TweetItem) => this.prefetchDetail(item),
-          onPlay: (item: TweetItem) => this.playingVideo = item.videoUrl
+          onPlay: (item: TweetItem) => this.playingVideo = item.videoUrl,
+          onImage: (url: string) => this.viewingImage = url
         })
       }.width('100%').height('100%')
       .visibility(this.tab == 0 ? Visibility.Visible : Visibility.None)
@@ -386,7 +395,8 @@ export struct NativeShell {
           onReply: (item: TweetItem) => this.openReply(item),
           onQuote: (item: TweetItem) => this.openQuote(item),
           onOpen: (item: TweetItem) => this.openDetail(item),
-          onPlay: (item: TweetItem) => this.playingVideo = item.videoUrl
+          onPlay: (item: TweetItem) => this.playingVideo = item.videoUrl,
+          onImage: (url: string) => this.viewingImage = url
         })
       }.width('100%').height('100%')
       .visibility(this.tab == 1 ? Visibility.Visible : Visibility.None)
@@ -402,15 +412,27 @@ export struct NativeShell {
   build() {
     Stack({ alignContent: Alignment.Bottom }) {
       if (!this.loggedIn) {
-        LoginView({
-          onLoggedIn: (cookie: string, jsUrls: string) => {
-            const context = getContext(this) as common.UIAbilityContext;
-            SessionStore.saveCookie(context, cookie);
-            SessionStore.saveJsUrls(context, jsUrls);
-            this.cookie = cookie;
-            this.loggedIn = true;
-          }
-        })
+        if (this.showWebLogin) {
+          LoginView({
+            onLoggedIn: (cookie: string, jsUrls: string) => {
+              const context = getContext(this) as common.UIAbilityContext;
+              SessionStore.saveCookie(context, cookie);
+              SessionStore.saveJsUrls(context, jsUrls);
+              this.cookie = cookie;
+              this.loggedIn = true;
+              this.showWebLogin = false;
+            }
+          })
+        } else {
+          NativeLogin({
+            onLoggedIn: (cookie: string) => {
+              SessionStore.saveCookie(getContext(this) as common.UIAbilityContext, cookie);
+              this.cookie = cookie;
+              this.loggedIn = true;
+            },
+            onWebLogin: () => this.showWebLogin = true
+          })
+        }
       } else {
         SideBarContainer(SideBarContainerType.Embed) {
           Column() {
@@ -460,6 +482,22 @@ export struct NativeShell {
             onClose: () => this.composing = false
           })
           .width('100%').height('100%')
+        }
+
+        if (this.viewingImage.length > 0) {
+          Stack({ alignContent: Alignment.TopEnd }) {
+            Image(this.viewingImage)
+              .width('100%').height('100%')
+              .objectFit(ImageFit.Contain)
+              .backgroundColor('#000000')
+            Button('关闭')
+              .margin({ top: 12, right: 12 })
+              .backgroundColor('#99000000')
+              .fontColor('#FFFFFF')
+              .onClick(() => this.viewingImage = '')
+          }
+          .width('100%').height('100%')
+          .backgroundColor('#000000')
         }
 
         if (this.playingVideo.length > 0) {

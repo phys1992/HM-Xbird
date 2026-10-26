@@ -10,6 +10,7 @@ export struct HomeFeed {
   onOpen: (item: TweetItem) => void = () => {};
   onPrefetch: (item: TweetItem) => void = () => {};
   onPlay: (item: TweetItem) => void = () => {};
+  onImage: (url: string) => void = () => {};
   @State tab: number = 0;
   @State tweets: TweetItem[] = [];
   @State loading: boolean = false;
@@ -17,6 +18,7 @@ export struct HomeFeed {
   @State notice: string = '';
   @State cursor: string = '';
   @State refreshing: boolean = false;
+  private listScroller: Scroller = new Scroller();
 
   aboutToAppear(): void {
     this.load(false);
@@ -42,6 +44,8 @@ export struct HomeFeed {
       this.tweets = more ? this.tweets.concat(page.tweets) : page.tweets;
       this.cursor = page.cursor;
       if (!more) {
+        const saved = AppStorage.get<number>('tuichuang_home_index') ?? 0;
+        if (saved > 0) setTimeout(() => { this.listScroller.scrollToIndex(saved); }, 120);
         for (let i = 0; i < this.tweets.length && i < 3; i++) {
           this.onPrefetch(this.tweets[i]);
         }
@@ -107,7 +111,7 @@ export struct HomeFeed {
           Text('暂无内容').fontSize(14).fontColor('#536471')
         }.layoutWeight(1).justifyContent(FlexAlign.Center)
       } else {
-        List() {
+        List({ scroller: this.listScroller }) {
           ForEach(this.tweets, (item: TweetItem) => {
             ListItem() {
               Column() {
@@ -117,7 +121,8 @@ export struct HomeFeed {
                   onReply: (value: TweetItem) => this.onReply(value),
                   onQuote: (value: TweetItem) => this.onQuote(value),
                   onOpen: (value: TweetItem) => this.onOpen(value),
-                  onPlay: (value: TweetItem) => this.onPlay(value)
+                  onPlay: (value: TweetItem) => this.onPlay(value),
+                  onImage: (url: string) => this.onImage(url)
                 })
                 Divider().color('#EFF3F4')
               }
@@ -132,6 +137,9 @@ export struct HomeFeed {
           }
         }
         .layoutWeight(1).width('100%')
+        .onScrollIndex((start: number) => {
+          AppStorage.setOrCreate('tuichuang_home_index', start);
+        })
         .onReachEnd(() => {
           if (!this.loading && this.cursor.length > 0) this.load(true);
         })
