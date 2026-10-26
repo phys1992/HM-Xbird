@@ -34,6 +34,9 @@ export struct NativeShell {
     }
     try {
       this.expanded = display.getFoldStatus() == display.FoldStatus.FOLD_STATUS_EXPANDED;
+      display.on('foldStatusChange', (status: number) => {
+        this.expanded = status == display.FoldStatus.FOLD_STATUS_EXPANDED;
+      });
     } catch (e) {}
   }
 
@@ -225,14 +228,15 @@ export struct NativeShell {
         SideBarContainer(SideBarContainerType.Embed) {
           Column() {
             this.contentPage()
-          }.width('100%').height('100%')
+          }.width('100%').height('100%').padding({ bottom: 76 })
 
           Column() {
             this.detailPane()
-          }.width('100%').height('100%')
+          }.width('100%').height('100%').padding({ bottom: 76 })
         }
         .showSideBar(true)
-        .sideBarWidth(this.expanded ? this.paneWidth * 0.5 : this.paneWidth)
+        .sideBarWidth(this.expanded ? this.paneWidth * 0.5 :
+          (this.selected != null ? 0 : this.paneWidth))
         .minSideBarWidth(1)
         .maxSideBarWidth(this.paneWidth)
         .minContentWidth(0)

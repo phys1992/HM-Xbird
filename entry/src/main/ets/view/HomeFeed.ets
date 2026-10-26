@@ -8,7 +8,7 @@ export struct HomeFeed {
   onReply: (item: TweetItem) => void = () => {};
   onQuote: (item: TweetItem) => void = () => {};
   onOpen: (item: TweetItem) => void = () => {};
-  @State tab: number = 1;
+  @State tab: number = 0;
   @State tweets: TweetItem[] = [];
   @State loading: boolean = false;
   @State error: string = '';
