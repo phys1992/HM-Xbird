@@ -9,6 +9,7 @@ import { HomeFeed } from './HomeFeed';
 import { SearchView } from './SearchView';
 import { XApi } from '../api/XApi';
 import { DetailCache } from '../model/DetailCache';
+import { NotificationItem } from '../model/NotificationItem';
 import { TweetCard } from './TweetCard';
 import { ComposeView } from './ComposeView';
 
@@ -21,6 +22,11 @@ export struct NativeShell {
   @State paneHeight: number = 800;
   @State barMode: number = 1;
   @State barX: number = 20;
+  @State notifications: NotificationItem[] = [];
+  @State notificationsLoading: boolean = false;
+  @State notificationsError: string = '';
+  @State notificationsLoaded: boolean = false;
+  @StorageLink('memoryTrimTick') @Watch('onMemoryTrim') memoryTick: number = 0;
   @State expanded: boolean = false;
   @State selected: TweetItem | null = null;
   @State detailTweets: TweetItem[] = [];
@@ -87,6 +93,34 @@ export struct NativeShell {
       this.barMode = target;
       this.updateBarX();
     });
+  }
+
+  private async loadNotifications(): Promise<void> {
+    if (this.notificationsLoading) return;
+    this.notificationsLoading = true;
+    this.notificationsError = '';
+    try {
+      const list = await XApi.notifications(this.cookie);
+      if (list.length > 0) this.notifications = list;
+      this.notificationsLoaded = true;
+    } catch (e) {
+      this.notificationsError = `${e}`;
+    } finally {
+      this.notificationsLoading = false;
+    }
+  }
+
+  private onMemoryTrim(): void {
+    DetailCache.clear();
+  }
+
+  private openNotification(item: NotificationItem): void {
+    if (item.tweetId.length == 0) return;
+    const tweet = new TweetItem();
+    tweet.id = item.tweetId;
+    tweet.authorName = item.authorName;
+    tweet.authorHandle = item.authorHandle;
+    this.openDetail(tweet);
   }
 
   private async openDetail(item: TweetItem): Promise<void> {
@@ -158,6 +192,7 @@ export struct NativeShell {
     .onClick(() => {
       this.tab = index;
       this.selected = null;
+      if (index == 2) this.loadNotifications();
     })
   }
 
@@ -217,8 +252,46 @@ export struct NativeShell {
   notificationsPage() {
     Column() {
       Text('通知').fontSize(20).fontWeight(FontWeight.Bold).width('100%').padding(16)
-      Text('通知接口将在下一阶段接入').fontSize(14).fontColor('#536471')
-      Blank()
+
+      if (this.notificationsLoading && this.notifications.length == 0) {
+        Column() { LoadingProgress().width(28).height(28) }
+          .layoutWeight(1).justifyContent(FlexAlign.Center)
+      } else if (this.notificationsError.length > 0 && this.notifications.length == 0) {
+        Column() {
+          Text(this.notificationsError).fontSize(13).fontColor('#F4212E').padding(16)
+          Button('重试').onClick(() => this.loadNotifications())
+        }.layoutWeight(1).justifyContent(FlexAlign.Center)
+      } else if (this.notifications.length == 0) {
+        Column() {
+          Text(this.notificationsLoaded ? '暂无通知' : '打开通知时加载').fontSize(14).fontColor('#536471')
+        }.layoutWeight(1).justifyContent(FlexAlign.Center)
+      } else {
+        List() {
+          ForEach(this.notifications, (item: NotificationItem) => {
+            ListItem() {
+              Column() {
+              Row() {
+                if (item.avatarUrl.length > 0) {
+                  Image(item.avatarUrl).width(36).height(36).borderRadius(18)
+                } else {
+                  Circle({ width: 36, height: 36 }).fill('#E1E8ED')
+                }
+                Column() {
+                  Text(item.message.length > 0 ? item.message : item.type)
+                    .fontSize(14).maxLines(4).textOverflow({ overflow: TextOverflow.Ellipsis })
+                  Text(item.authorName.length > 0 ? `@${item.authorHandle}` : '')
+                    .fontSize(12).fontColor('#536471').margin({ top: 3 })
+                }.alignItems(HorizontalAlign.Start).layoutWeight(1).margin({ left: 10 })
+              }
+              .width('100%').padding(14)
+              .onClick(() => this.openNotification(item))
+              Divider().color('#EFF3F4')
+              }.width('100%')
+            }
+          }, (item: NotificationItem) => item.id)
+        }
+        .layoutWeight(1).width('100%')
+      }
     }.width('100%').height('100%').alignItems(HorizontalAlign.Start)
   }
 

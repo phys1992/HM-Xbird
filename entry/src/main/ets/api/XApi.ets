@@ -1,6 +1,7 @@
 import { http } from '@kit.NetworkKit';
 import { QueryIds } from './QueryIds';
 import { TweetItem } from '../model/TweetItem';
+import { NotificationItem } from '../model/NotificationItem';
 
 const BEARER = 'Bearer AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs%3D1Zv7ttfk8LF81IUq16cHjhLTvJu4FA33AGWWjCpTnA';
 const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36';
@@ -535,6 +536,85 @@ export class XApi {
     }
     if (result.tweets.length == 0) {
       throw new Error('推文详情为空');
+    }
+    return result;
+  }
+
+
+  static async notifications(cookie: string): Promise<NotificationItem[]> {
+    let queryId = '';
+    let operation = 'NotificationsTimeline';
+    try {
+      queryId = await QueryIds.resolve(cookie, 'NotificationsTimeline');
+    } catch (e) {
+      operation = 'Notifications';
+      queryId = await QueryIds.resolve(cookie, 'Notifications');
+    }
+    const variables: Record<string, Object> = {
+      'count': 20,
+      'includePromotedContent': false,
+      'withClientEventToken': false,
+      'withBirdwatchNotes': false,
+      'withVoice': true
+    };
+    const url = `https://x.com/i/api/graphql/${queryId}/${operation}` +
+      `?variables=${encodeURIComponent(JSON.stringify(variables))}` +
+      `&features=${encodeURIComponent(JSON.stringify(READ_FEATURES))}`;
+    const request = http.createHttp();
+    let text = '';
+    try {
+      const response = await request.request(url, {
+        method: http.RequestMethod.GET,
+        header: XApi.headers(cookie),
+        expectDataType: http.HttpDataType.STRING,
+        connectTimeout: 20000,
+        readTimeout: 20000
+      });
+      if (response.responseCode < 200 || response.responseCode >= 300) {
+        throw new Error(`HTTP ${response.responseCode}`);
+      }
+      text = response.result as string;
+    } finally {
+      request.destroy();
+    }
+    const root = asObj(JSON.parse(text) as Object);
+    const data = asObj(root == null ? null : root['data']);
+    const urt = asObj(data == null ? null : (data['notifications_urt'] != undefined ? data['notifications_urt'] : data['notifications']));
+    const instructions = asArr(urt == null ? null : urt['instructions']);
+    const result: NotificationItem[] = [];
+    for (const rawInstruction of instructions) {
+      const instruction = asObj(rawInstruction);
+      if (instruction == null || asString(instruction['type']) != 'TimelineAddEntries') continue;
+      for (const rawEntry of asArr(instruction['entries'])) {
+        const entry = asObj(rawEntry);
+        if (entry == null) continue;
+        const entryId = asString(entry['entryId']);
+        if (entryId.indexOf('notification-') < 0) continue;
+        const content = asObj(entry['content']);
+        const itemContent = asObj(content == null ? null : content['itemContent']);
+        const notificationResults = asObj(itemContent == null ? null : itemContent['notification_results']);
+        const notification = asObj(notificationResults == null ? null : notificationResults['result']);
+        if (notification == null) continue;
+        const item = new NotificationItem();
+        item.id = asString(notification['id']);
+        item.type = asString(notification['notification_type']);
+        item.message = asString(notification['message']);
+        const fromUsers = asArr(notification['from_users']);
+        if (fromUsers.length > 0) {
+          const user = asObj(fromUsers[0]);
+          if (user != null) {
+            item.authorName = asString(user['name']);
+            item.authorHandle = asString(user['screen_name']);
+            item.avatarUrl = asString(user['profile_image_url_https']);
+          }
+        }
+        const tweetResults = asObj(notification['tweet_results']);
+        const tweet = asObj(tweetResults == null ? null : tweetResults['result']);
+        if (tweet != null) {
+          item.tweetId = asString(tweet['rest_id']);
+        }
+        if (item.id.length > 0) result.push(item);
+      }
     }
     return result;
   }
