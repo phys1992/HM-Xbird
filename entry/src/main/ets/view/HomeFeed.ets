@@ -4,6 +4,7 @@ import { TweetCard } from './TweetCard';
 
 @Component
 export struct HomeFeed {
+  private static scrollOffset: number = 0;
   cookie: string = '';
   onReply: (item: TweetItem) => void = () => {};
   onQuote: (item: TweetItem) => void = () => {};
@@ -46,8 +47,13 @@ export struct HomeFeed {
       this.tweets = more ? this.tweets.concat(page.tweets) : page.tweets;
       this.cursor = page.cursor;
       if (!more) {
-        const saved = AppStorage.get<number>('tuichuang_home_index') ?? 0;
-        if (saved > 0) setTimeout(() => { this.listScroller.scrollToIndex(saved); }, 120);
+        const savedOffset = AppStorage.get<number>('tuichuang_home_offset') ?? 0;
+        HomeFeed.scrollOffset = savedOffset;
+        if (savedOffset > 0) {
+          setTimeout(() => {
+            this.listScroller.scrollTo({ xOffset: 0, yOffset: savedOffset, animation: false });
+          }, 120);
+        }
         for (let i = 0; i < this.tweets.length && i < 3; i++) {
           this.onPrefetch(this.tweets[i]);
         }
@@ -113,6 +119,7 @@ export struct HomeFeed {
           Text('暂无内容').fontSize(14).fontColor('#536471')
         }.layoutWeight(1).justifyContent(FlexAlign.Center)
       } else {
+        Refresh({ refreshing: this.refreshing }) {
         List({ scroller: this.listScroller }) {
           ForEach(this.tweets, (item: TweetItem) => {
             ListItem() {
@@ -141,12 +148,20 @@ export struct HomeFeed {
           }
         }
         .layoutWeight(1).width('100%')
-        .onScrollIndex((start: number) => {
-          AppStorage.setOrCreate('tuichuang_home_index', start);
+        .onScroll((offset: number) => {
+          HomeFeed.scrollOffset = Math.max(0, HomeFeed.scrollOffset + offset);
+          AppStorage.setOrCreate('tuichuang_home_offset', HomeFeed.scrollOffset);
         })
         .onReachEnd(() => {
           if (!this.loading && this.cursor.length > 0) this.load(true);
         })
+        }
+        .onRefreshing(() => {
+          this.refreshing = true;
+          this.cursor = '';
+          this.load(false).then(() => { this.refreshing = false; });
+        })
+        .layoutWeight(1)
       }
     }
     .width('100%').height('100%')
