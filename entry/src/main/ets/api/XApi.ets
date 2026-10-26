@@ -452,6 +452,15 @@ export class XApi {
 
 
   static async forYou(cookie: string, cursor: string): Promise<HomeResult> {
+    // Without a captured WebView bundle, prefer the REST timeline instead of
+    // waiting for a queryId scan that may never find HomeTimeline.
+    if (!QueryIds.hasBundles()) {
+      try {
+        return await XApi.homeLatestRest(cookie, cursor);
+      } catch (e) {
+        // Fall through to GraphQL.
+      }
+    }
     const queryId = await QueryIds.resolve(cookie, 'HomeTimeline');
     const variables: Record<string, Object> = {
       'count': 20,

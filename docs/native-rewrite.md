@@ -261,3 +261,11 @@ ArrowTS UI
   - `statuses/show.json` 取主推文；
   - `2/timeline/conversation/<id>.json` 取评论；
 - 避免 queryId 变化导致详情完全不可用。
+
+
+## 21. 纯 Cookie 主页回退
+
+- `QueryIds.hasBundles()` 判断是否有网页登录抓取的 JS；
+- 没有 JS 缓存时，For You 直接优先 REST `home_timeline`，避免等待 queryId 扫描；
+- REST 失败再走 GraphQL；
+- 详情已有 GraphQL + REST 双通道。

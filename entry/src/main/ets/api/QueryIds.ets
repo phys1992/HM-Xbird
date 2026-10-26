@@ -6,6 +6,13 @@ export class QueryIds {
   private static cache: Map<string, string> = new Map();
   private static bundleUrls: string[] = [];
 
+  static hasBundles(): boolean {
+    for (const url of QueryIds.bundleUrls) {
+      if (url.indexOf('.js') >= 0) return true;
+    }
+    return false;
+  }
+
   static setBundleUrls(urls: string[]): void {
     QueryIds.bundleUrls = urls;
     QueryIds.cache.clear();
