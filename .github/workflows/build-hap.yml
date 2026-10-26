@@ -57,7 +57,7 @@ jobs:
       - name: Build HAP
         run: |
           set -euo pipefail
-          chmod +x "$CLI/bin/hvigorw" || true
+          chmod +x "$CLI/bin/hvigorw" "$CLI/tool/node/bin/node" || true
           hvigorw assembleHap \
             --mode module \
             -p module=entry@default \
