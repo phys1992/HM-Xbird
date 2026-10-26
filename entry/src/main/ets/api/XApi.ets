@@ -1,7 +1,7 @@
 import { http } from '@kit.NetworkKit';
 import { QueryIds } from './QueryIds';
 import { TweetItem } from '../model/TweetItem';
-import { NotificationItem } from '../model/NotificationItem';
+import { NotificationItem, NotificationPage } from '../model/NotificationItem';
 import { UserProfile } from '../model/UserProfile';
 
 const BEARER = 'Bearer AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs%3D1Zv7ttfk8LF81IUq16cHjhLTvJu4FA33AGWWjCpTnA';
@@ -659,14 +659,18 @@ export class XApi {
   }
 
   static async notifications(cookie: string): Promise<NotificationItem[]> {
+    return (await XApi.notificationsPage(cookie, '')).items;
+  }
+
+  static async notificationsPage(cookie: string, cursor: string): Promise<NotificationPage> {
     try {
-      return await XApi.notificationsGraphql(cookie);
+      return await XApi.notificationsGraphql(cookie, cursor);
     } catch (e) {
       return await XApi.notificationsRest(cookie);
     }
   }
 
-  private static async notificationsGraphql(cookie: string): Promise<NotificationItem[]> {
+  private static async notificationsGraphql(cookie: string, cursor: string): Promise<NotificationPage> {
     let queryId = '';
     let operation = 'NotificationsTimeline';
     try {
@@ -682,6 +686,7 @@ export class XApi {
       'withBirdwatchNotes': false,
       'withVoice': true
     };
+    if (cursor.length > 0) variables['cursor'] = cursor;
     const url = `https://x.com/i/api/graphql/${queryId}/${operation}` +
       `?variables=${encodeURIComponent(JSON.stringify(variables))}` +
       `&features=${encodeURIComponent(JSON.stringify(READ_FEATURES))}`;
@@ -706,7 +711,8 @@ export class XApi {
     const data = asObj(root == null ? null : root['data']);
     const urt = asObj(data == null ? null : (data['notifications_urt'] != undefined ? data['notifications_urt'] : data['notifications']));
     const instructions = asArr(urt == null ? null : urt['instructions']);
-    const result: NotificationItem[] = [];
+    const page = new NotificationPage();
+    const result: NotificationItem[] = page.items;
     for (const rawInstruction of instructions) {
       const instruction = asObj(rawInstruction);
       if (instruction == null || asString(instruction['type']) != 'TimelineAddEntries') continue;
@@ -714,6 +720,11 @@ export class XApi {
         const entry = asObj(rawEntry);
         if (entry == null) continue;
         const entryId = asString(entry['entryId']);
+        if (entryId.indexOf('cursor-bottom') >= 0) {
+          const content = asObj(entry['content']);
+          page.cursor = asString(content == null ? null : content['value']);
+          continue;
+        }
         if (entryId.indexOf('notification-') < 0) continue;
         const content = asObj(entry['content']);
         const itemContent = asObj(content == null ? null : content['itemContent']);
@@ -741,7 +752,7 @@ export class XApi {
         if (item.id.length > 0) result.push(item);
       }
     }
-    return result;
+    return page;
   }
 
 
@@ -790,7 +801,7 @@ export class XApi {
   }
 
 
-  private static async notificationsRest(cookie: string): Promise<NotificationItem[]> {
+  private static async notificationsRest(cookie: string): Promise<NotificationPage> {
     const url = 'https://x.com/i/api/1.1/notifications/all.json' +
       '?count=20&tweet_mode=extended&include_entities=true';
     const request = http.createHttp();
@@ -815,7 +826,8 @@ export class XApi {
     const users = asObj(globalObjects == null ? null : globalObjects['users']);
     const timeline = asObj(root == null ? null : root['timeline']);
     const instructions = asArr(timeline == null ? null : timeline['instructions']);
-    const result: NotificationItem[] = [];
+    const page = new NotificationPage();
+    const result: NotificationItem[] = page.items;
     for (const rawInstruction of instructions) {
       const instruction = asObj(rawInstruction);
       if (instruction == null) continue;
@@ -842,7 +854,7 @@ export class XApi {
       }
     }
     if (result.length == 0) throw new Error('通知为空（REST）');
-    return result;
+    return page;
   }
 
 

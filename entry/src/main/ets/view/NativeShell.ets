@@ -29,6 +29,7 @@ export struct NativeShell {
   @State notificationsLoading: boolean = false;
   @State notificationsError: string = '';
   @State notificationsLoaded: boolean = false;
+  @State notificationsCursor: string = '';
   @State profile: UserProfile | null = null;
   @State profileLoading: boolean = false;
   @State myTweets: TweetItem[] = [];
@@ -179,13 +180,15 @@ export struct NativeShell {
     }
   }
 
-  private async loadNotifications(): Promise<void> {
+  private async loadNotifications(more: boolean = false): Promise<void> {
     if (this.notificationsLoading) return;
+    if (more && this.notificationsCursor.length == 0) return;
     this.notificationsLoading = true;
     this.notificationsError = '';
     try {
-      const list = await XApi.notifications(this.cookie);
-      if (list.length > 0) this.notifications = list;
+      const page = await XApi.notificationsPage(this.cookie, more ? this.notificationsCursor : '');
+      this.notifications = more ? this.notifications.concat(page.items) : page.items;
+      this.notificationsCursor = page.cursor;
       this.notificationsLoaded = true;
     } catch (e) {
       this.notificationsError = `${e}`;
@@ -283,7 +286,7 @@ export struct NativeShell {
     .onClick(() => {
       this.tab = index;
       this.selected = null;
-      if (index == 2) this.loadNotifications();
+      if (index == 2 && !this.notificationsLoaded) this.loadNotifications(false);
     })
   }
 
@@ -414,7 +417,7 @@ export struct NativeShell {
       } else if (this.notificationsError.length > 0 && this.notifications.length == 0) {
         Column() {
           Text(this.notificationsError).fontSize(13).fontColor('#F4212E').padding(16)
-          Button('重试').onClick(() => this.loadNotifications())
+          Button('重试').onClick(() => this.loadNotifications(false))
         }.layoutWeight(1).justifyContent(FlexAlign.Center)
       } else if (this.notifications.length == 0) {
         Column() {
@@ -446,6 +449,7 @@ export struct NativeShell {
           }, (item: NotificationItem) => item.id)
         }
         .layoutWeight(1).width('100%')
+        .onReachEnd(() => this.loadNotifications(true))
       }
     }.width('100%').height('100%').alignItems(HorizontalAlign.Start)
   }

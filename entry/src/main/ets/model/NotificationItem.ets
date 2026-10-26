@@ -7,3 +7,8 @@ export class NotificationItem {
   avatarUrl: string = '';
   tweetId: string = '';
 }
+
+export class NotificationPage {
+  items: NotificationItem[] = [];
+  cursor: string = '';
+}

@@ -325,3 +325,11 @@ ArrowTS UI
 - 滚动累计偏移写入 AppStorage；
 - 重新加载后按像素偏移恢复；
 - 分页 cursor 与刷新互斥，避免重复页。
+
+
+## 29. 通知分页
+
+- `NotificationPage` 带 cursor；
+- GraphQL 解析 `cursor-bottom`；
+- 通知列表滚动到底加载下一页；
+- REST 回退没有 cursor 时停止分页。
