@@ -357,7 +357,7 @@ export class XApi {
     }
   }
 
-  static async search(cookie: string, query: string): Promise<HomeResult> {
+  static async search(cookie: string, query: string, cursor: string = ''): Promise<HomeResult> {
     const queryId = await QueryIds.resolve(cookie, 'SearchTimeline');
     const variables: Record<string, Object> = {
       'rawQuery': query,
@@ -365,6 +365,7 @@ export class XApi {
       'querySource': 'typed_query',
       'product': 'Top'
     };
+    if (cursor.length > 0) variables['cursor'] = cursor;
     const url = `https://x.com/i/api/graphql/${queryId}/SearchTimeline` +
       `?variables=${encodeURIComponent(JSON.stringify(variables))}` +
       `&features=${encodeURIComponent(JSON.stringify(READ_FEATURES))}`;
@@ -403,6 +404,11 @@ export class XApi {
         const entry = asObj(rawEntry);
         if (entry == null) continue;
         const entryId = asString(entry['entryId']);
+        if (entryId.indexOf('cursor-bottom') >= 0) {
+          const content = asObj(entry['content']);
+          result.cursor = asString(content == null ? null : content['value']);
+          continue;
+        }
         if (entryId.indexOf('tweet-') < 0) continue;
         const tweet = parseTweet(entry);
         if (tweet != null && tweet.id.length > 0) result.tweets.push(tweet);

@@ -16,6 +16,8 @@ export struct SearchView {
   @State loading: boolean = false;
   @State error: string = '';
   @State searched: boolean = false;
+  @State cursor: string = '';
+  @State moreLoading: boolean = false;
 
   private async runSearch(): Promise<void> {
     const q = this.query.trim();
@@ -24,13 +26,28 @@ export struct SearchView {
     this.error = '';
     this.searched = true;
     try {
-      const page = await XApi.search(this.cookie, q);
+      const page = await XApi.search(this.cookie, q, '');
       this.tweets = page.tweets;
+      this.cursor = page.cursor;
     } catch (e) {
       this.error = `${e}`;
       this.tweets = [];
     } finally {
       this.loading = false;
+    }
+  }
+
+  private async loadMore(): Promise<void> {
+    if (this.moreLoading || this.loading || this.cursor.length == 0) return;
+    this.moreLoading = true;
+    try {
+      const page = await XApi.search(this.cookie, this.query.trim(), this.cursor);
+      if (page.tweets.length > 0) this.tweets = this.tweets.concat(page.tweets);
+      this.cursor = page.cursor;
+    } catch (e) {
+      // Keep existing results; the next scroll can retry.
+    } finally {
+      this.moreLoading = false;
     }
   }
 
@@ -77,6 +94,7 @@ export struct SearchView {
             }
           }, (item: TweetItem) => item.id)
         }.layoutWeight(1)
+        .onReachEnd(() => this.loadMore())
       }
     }.width('100%').height('100%')
   }
