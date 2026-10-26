@@ -1,43 +1,67 @@
-# X Harmony（ArkTS 原生，B 方案）
+# X Harmony
 
-不依赖 Flutter 的纯 ArkTS 客户端。当前完成第一里程碑：
+X Harmony 是一个面向 HarmonyOS NEXT 的非官方 X（Twitter）客户端，重点适配华为折叠屏手机。它把 X 网页的完整功能与 HarmonyOS 的原生交互结合起来，在折叠屏展开时提供左右分栏，折叠时保持单栏浏览。
 
-- 纯 ArkTS 工程，`hvigorw assembleHap` 可直接构建；
-- 登录页使用系统 ArkWeb 组件打开 `x.com/i/flow/login`；
-- 通过 `webview.WebCookieManager.fetchCookie('https://x.com')` 读取 Cookie
-  （包含 HttpOnly 的 `auth_token`，解决 Flutter 方案里账号存不下的问题）；
-- Cookie 存入 Preferences，重启后保持登录；
-- 登录后进入 X 风格四标签壳：Home / Search / Notifications / Messages；
-- 退出登录会清空 Cookie。
+> 本项目为非官方第三方客户端，与 X Corp. 无隶属或合作关系。X、Twitter 及相关标识归其各自权利人所有。
 
-## 构建
+## 用途
 
-工程路径不能含中文，需要复制到 ASCII 路径构建：
+- 在 HarmonyOS NEXT 设备上浏览 X 的时间线、推文、评论、搜索和通知；
+- 在华为折叠屏手机（如 Mate X5、X7、XT、XT2 等）上使用分栏浏览；
+- 使用原生悬浮底栏、发帖页和折叠屏自适应布局，减少网页版在折叠屏上的操作不便。
 
-```bash
-cp -a x-harmony /tmp/xh && cd /tmp/xh
-export DEVECO_SDK_HOME=/path/to/command-line-tools/sdk
-export PATH=/path/to/command-line-tools/bin:/path/to/command-line-tools/tool/node/bin:$PATH
-hvigorw assembleHap --mode module -p module=entry@default \
-  -p product=default -p buildMode=debug --no-daemon
-```
+## 实现方案
 
-产物：`entry/build/default/outputs/default/entry-default-unsigned.hap`（约 78 KB，
-未签名）。
+- 使用 HarmonyOS 原生 ArkTS 构建应用外壳、底部导航、折叠屏分栏和过渡动画；
+- 通过 ArkWeb 加载 X 网页，复用 X 的登录态和完整页面功能；
+- 原生层负责账号登录态保存、页面隐藏、左右分栏、发帖入口和返回手势；
+- 针对折叠屏状态和屏幕宽度自动切换单栏/双栏；
+- 本地缓存已加载页面，并对推文详情做预取，减少重复加载和等待。
 
-## 第二里程碑（2026-10-26）
+## 已实现功能
 
-- `api/QueryIds.ets`：抓取已登录的 x.com 页面与 JS bundle，按 operation 名解析 `queryId`；
-- `api/XApi.ets`：请求 `HomeLatestTimeline`（GraphQL，读取 features），解析推文；
-- `model/TweetItem.ets`：原生推文模型；
-- `view/HomeView.ets`：原生时间线列表（头像、昵称、正文、图片、互动数、下拉/触底加载、刷新）；
-- 构建产物约 128 KB。
+- 登录 X 账号，并在应用内保持登录状态；
+- 主页“为你推荐 / 正在关注”双标签浏览，支持滑动切换；
+- 搜索、通知、个人主页入口；
+- 折叠屏展开时左右分栏：
+  - 左栏浏览时间线；
+  - 右栏显示推文详情与评论；
+- 折叠时单栏浏览，展开/折叠自动切换；
+- 悬浮底部导航栏：
+  - 主页、搜索、发帖、通知、我的；
+  - 选中态提示；
+  - 左右滑动切换位置；
+  - 沉浸光感/模糊效果；
+- 原生发帖页面；
+- 系统返回手势逐层返回；
+- 页面缓存、推文详情预取和内存缓存回收；
+- 折叠/展开与分栏切换过渡动画。
 
-## 下一步
+## 安装方法
 
-1. `api/QueryIds.ets`：运行时从 x.com 页面 JS 解析 GraphQL queryId；
-2. `api/XApi.ets`：请求 `HomeLatestTimeline`，解析推文；
-3. 原生 Home 列表 / 推文卡片 / 详情页；
-4. 点赞、转推、发推、回复、引用（移植 Dart 的写接口逻辑）；
-5. `x-client-transaction-id` 的 ArkTS 移植；
-6. 折叠屏双栏、Mate X7 悬停。
+1. 前往本项目的 **Releases** 页面，下载对应版本的 `.hap` 文件；
+2. 使用 **小白调试助手** 安装到 HarmonyOS NEXT 设备：
+   - 项目地址：<https://github.com/likuai2010/auto-installer>
+   - 具体安装步骤、设备要求和签名说明，请以该项目文档为准；
+3. 安装完成后，在设备桌面找到 **X Harmony** 并打开，登录 X 账号即可使用。
+
+> 说明：Release 中的 HAP 为未签名构建，安装时可能需要按小白调试助手的指引完成签名或开发者模式配置。请只在可信设备上安装。
+
+## 系统要求
+
+- HarmonyOS NEXT 设备；
+- 可正常访问 X 的网络环境；
+- 折叠屏分栏功能需要设备支持折叠状态/角度上报。
+
+## 开源协议
+
+本项目使用 **MIT License** 开源，详见 [LICENSE](LICENSE)。
+
+你可以自由使用、修改和分发本项目代码，但需保留版权声明和许可声明。项目按“现状”提供，不对使用后果或第三方服务可用性作担保。
+
+## 已知限制
+
+- X 网页结构变化可能导致部分界面元素显示异常，需要后续版本适配；
+- 私信、Grok、直播等长尾功能未做专门适配；
+- 第三方客户端可能受 X 服务策略、限流或登录策略影响；
+- 使用非官方客户端存在账号风控风险，请自行评估。
