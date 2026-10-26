@@ -22,7 +22,7 @@ hvigorw assembleHap --mode module -p module=entry@default \
   -p product=default -p buildMode=debug --no-daemon
 ```
 
-产物：`entry/build/default/outputs/default/tuichuang-0.1.0-unsigned.hap`（约 78 KB，
+产物：`entry/build/default/outputs/default/tuichuang-unsigned.hap`（约 78 KB，
 未签名）。
 
 ## 第二里程碑（2026-10-26）
