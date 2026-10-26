@@ -2,6 +2,7 @@ import { http } from '@kit.NetworkKit';
 import { QueryIds } from './QueryIds';
 import { TweetItem } from '../model/TweetItem';
 import { NotificationItem } from '../model/NotificationItem';
+import { UserProfile } from '../model/UserProfile';
 
 const BEARER = 'Bearer AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs%3D1Zv7ttfk8LF81IUq16cHjhLTvJu4FA33AGWWjCpTnA';
 const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36';
@@ -655,6 +656,51 @@ export class XApi {
       }
     }
     return result;
+  }
+
+
+  static async userByRestId(cookie: string, userId: string): Promise<UserProfile> {
+    const queryId = await QueryIds.resolve(cookie, 'UserByRestId');
+    const variables: Record<string, Object> = {
+      'userId': userId,
+      'withSafetyModeUserFields': true
+    };
+    const url = `https://x.com/i/api/graphql/${queryId}/UserByRestId` +
+      `?variables=${encodeURIComponent(JSON.stringify(variables))}` +
+      `&features=${encodeURIComponent(JSON.stringify(READ_FEATURES))}`;
+    const request = http.createHttp();
+    let text = '';
+    try {
+      const response = await request.request(url, {
+        method: http.RequestMethod.GET,
+        header: XApi.headers(cookie),
+        expectDataType: http.HttpDataType.STRING,
+        connectTimeout: 20000,
+        readTimeout: 20000
+      });
+      if (response.responseCode < 200 || response.responseCode >= 300) {
+        throw new Error(`HTTP ${response.responseCode}`);
+      }
+      text = response.result as string;
+    } finally {
+      request.destroy();
+    }
+    const root = asObj(JSON.parse(text) as Object);
+    const data = asObj(root == null ? null : root['data']);
+    const user = asObj(data == null ? null : data['user']);
+    const result = asObj(user == null ? null : user['result']);
+    const legacy = asObj(result == null ? null : result['legacy']);
+    if (legacy == null) throw new Error('用户资料为空');
+    const profile = new UserProfile();
+    profile.id = asString(result == null ? null : result['rest_id']);
+    profile.name = asString(legacy['name']);
+    profile.handle = asString(legacy['screen_name']);
+    profile.description = asString(legacy['description']);
+    profile.avatarUrl = asString(legacy['profile_image_url_https']);
+    profile.bannerUrl = asString(legacy['profile_banner_url']);
+    profile.followers = asNumber(legacy['followers_count']);
+    profile.following = asNumber(legacy['friends_count']);
+    return profile;
   }
 
 }

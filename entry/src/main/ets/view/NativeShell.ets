@@ -11,6 +11,7 @@ import { SearchView } from './SearchView';
 import { XApi } from '../api/XApi';
 import { DetailCache } from '../model/DetailCache';
 import { NotificationItem } from '../model/NotificationItem';
+import { UserProfile } from '../model/UserProfile';
 import { TweetCard } from './TweetCard';
 import { ComposeView } from './ComposeView';
 
@@ -27,6 +28,8 @@ export struct NativeShell {
   @State notificationsLoading: boolean = false;
   @State notificationsError: string = '';
   @State notificationsLoaded: boolean = false;
+  @State profile: UserProfile | null = null;
+  @State profileLoading: boolean = false;
   @State splitEnabled: boolean = true;
   @State playingVideo: string = '';
   @State viewingImage: string = '';
@@ -52,6 +55,7 @@ export struct NativeShell {
     if (saved.length > 0) {
       this.cookie = saved;
       this.loggedIn = true;
+      this.loadProfile();
     }
     this.splitEnabled = SessionStore.loadSplitEnabled(context);
     try {
@@ -108,6 +112,39 @@ export struct NativeShell {
       this.barMode = target;
       this.updateBarX();
     });
+  }
+
+  private twid(): string {
+    const marker = 'twid=';
+    const at = this.cookie.indexOf(marker);
+    if (at < 0) return '';
+    let value = this.cookie.substring(at + marker.length);
+    const semi = value.indexOf(';');
+    if (semi >= 0) value = value.substring(0, semi);
+    try { value = decodeURIComponent(value); } catch (e) {}
+    const u = value.indexOf('u=');
+    if (u < 0) return '';
+    const id = value.substring(u + 2);
+    let out = '';
+    for (let i = 0; i < id.length; i++) {
+      const c = id.charAt(i);
+      if (c >= '0' && c <= '9') out += c;
+      else break;
+    }
+    return out;
+  }
+
+  private async loadProfile(): Promise<void> {
+    const id = this.twid();
+    if (id.length == 0 || this.profileLoading) return;
+    this.profileLoading = true;
+    try {
+      this.profile = await XApi.userByRestId(this.cookie, id);
+    } catch (e) {
+      // Keep the page usable; profile header is optional.
+    } finally {
+      this.profileLoading = false;
+    }
   }
 
   private async loadNotifications(): Promise<void> {
@@ -243,12 +280,29 @@ export struct NativeShell {
   mePage() {
     Column() {
       Row() {
-        Circle({ width: 52, height: 52 }).fill('#1D9BF0')
+        if (this.profile != null && this.profile.avatarUrl.length > 0) {
+          Image(this.profile.avatarUrl).width(56).height(56).borderRadius(28)
+        } else {
+          Circle({ width: 56, height: 56 }).fill('#1D9BF0')
+        }
         Column() {
-          Text('tuichuang').fontSize(17).fontWeight(FontWeight.Bold)
-          Text('已登录 X').fontSize(13).fontColor('#536471').margin({ top: 2 })
-        }.alignItems(HorizontalAlign.Start).margin({ left: 12 })
+          Text(this.profile != null ? this.profile.name : 'tuichuang')
+            .fontSize(17).fontWeight(FontWeight.Bold)
+          Text(this.profile != null ? `@${this.profile.handle}` : '正在加载资料…')
+            .fontSize(13).fontColor('#536471').margin({ top: 2 })
+        }.alignItems(HorizontalAlign.Start).margin({ left: 12 }).layoutWeight(1)
       }.width('100%').padding(16)
+
+      if (this.profile != null && this.profile.description.length > 0) {
+        Text(this.profile.description).fontSize(14).lineHeight(20)
+          .width('100%').padding({ left: 16, right: 16, bottom: 10 })
+      }
+      if (this.profile != null) {
+        Row() {
+          Text(`${this.profile.following} 正在关注`).fontSize(13).fontColor('#536471')
+          Text(`${this.profile.followers} 关注者`).fontSize(13).fontColor('#536471').margin({ left: 16 })
+        }.width('100%').padding({ left: 16, bottom: 12 })
+      }
 
       Divider().color('#EFF3F4')
       Row() {
@@ -421,6 +475,7 @@ export struct NativeShell {
               this.cookie = cookie;
               this.loggedIn = true;
               this.showWebLogin = false;
+              this.loadProfile();
             }
           })
         } else {
@@ -429,6 +484,7 @@ export struct NativeShell {
               SessionStore.saveCookie(getContext(this) as common.UIAbilityContext, cookie);
               this.cookie = cookie;
               this.loggedIn = true;
+              this.loadProfile();
             },
             onWebLogin: () => this.showWebLogin = true
           })

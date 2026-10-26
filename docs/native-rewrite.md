@@ -229,3 +229,11 @@ ArrowTS UI
 - 无网页登录缓存时，`TweetDetail` / `SearchTimeline` / `CreateTweet` 使用已知 queryId 回退；
 - 有网页登录抓取时仍优先使用实时 queryId；
 - 减少纯 Cookie 登录后的首次失败等待。
+
+
+## 17. 我的页资料
+
+- 原生 `UserByRestId` 请求，从 Cookie `twid` 解析当前用户；
+- 我的页显示头像、昵称、@handle、简介、关注/粉丝数；
+- queryId 回退 `mxaYWwt52eAb6OAzYHMVzg`；
+- 分栏开关和退出登录保持原生。
