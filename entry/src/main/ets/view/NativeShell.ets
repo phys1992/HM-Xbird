@@ -184,6 +184,13 @@ export struct NativeShell {
     this.openDetail(tweet);
   }
 
+  private openQuoted(id: string): void {
+    if (id.length == 0) return;
+    const tweet = new TweetItem();
+    tweet.id = id;
+    this.openDetail(tweet);
+  }
+
   private async openDetail(item: TweetItem): Promise<void> {
     this.selected = item;
     this.detailError = '';
@@ -429,7 +436,8 @@ export struct NativeShell {
                     onReply: (value: TweetItem) => this.openReply(value),
                     onQuote: (value: TweetItem) => this.openQuote(value),
                     onPlay: (value: TweetItem) => this.playingVideo = value.videoUrl,
-                    onImage: (url: string) => this.viewingImage = url
+                    onImage: (url: string) => this.viewingImage = url,
+                    onOpenQuoted: (id: string) => this.openQuoted(id)
                   })
                   Divider().color('#EFF3F4')
                 }
@@ -461,7 +469,8 @@ export struct NativeShell {
           onOpen: (item: TweetItem) => this.openDetail(item),
           onPrefetch: (item: TweetItem) => this.prefetchDetail(item),
           onPlay: (item: TweetItem) => this.playingVideo = item.videoUrl,
-          onImage: (url: string) => this.viewingImage = url
+          onImage: (url: string) => this.viewingImage = url,
+          onOpenQuoted: (id: string) => this.openQuoted(id)
         })
       }.width('100%').height('100%')
       .visibility(this.tab == 0 ? Visibility.Visible : Visibility.None)
@@ -473,7 +482,8 @@ export struct NativeShell {
           onQuote: (item: TweetItem) => this.openQuote(item),
           onOpen: (item: TweetItem) => this.openDetail(item),
           onPlay: (item: TweetItem) => this.playingVideo = item.videoUrl,
-          onImage: (url: string) => this.viewingImage = url
+          onImage: (url: string) => this.viewingImage = url,
+          onOpenQuoted: (id: string) => this.openQuoted(id)
         })
       }.width('100%').height('100%')
       .visibility(this.tab == 1 ? Visibility.Visible : Visibility.None)

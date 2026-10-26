@@ -11,6 +11,7 @@ export struct TweetCard {
   onOpen: (item: TweetItem) => void = () => {};
   onPlay: (item: TweetItem) => void = () => {};
   onImage: (url: string) => void = () => {};
+  onOpenQuoted: (id: string) => void = () => {};
   @State liked: boolean = false;
   @State retweeted: boolean = false;
   @State likeCount: number = 0;
@@ -118,6 +119,7 @@ export struct TweetCard {
           .width('100%').padding(10).margin({ top: 8 })
           .border({ width: 1, color: '#CFD9DE' }).borderRadius(12)
           .alignItems(HorizontalAlign.Start)
+          .onClick(() => this.onOpenQuoted(this.item.quotedId))
         }
 
         Row() {

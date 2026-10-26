@@ -11,6 +11,7 @@ export struct HomeFeed {
   onPrefetch: (item: TweetItem) => void = () => {};
   onPlay: (item: TweetItem) => void = () => {};
   onImage: (url: string) => void = () => {};
+  onOpenQuoted: (id: string) => void = () => {};
   @State tab: number = 0;
   @State tweets: TweetItem[] = [];
   @State loading: boolean = false;
@@ -122,7 +123,8 @@ export struct HomeFeed {
                   onQuote: (value: TweetItem) => this.onQuote(value),
                   onOpen: (value: TweetItem) => this.onOpen(value),
                   onPlay: (value: TweetItem) => this.onPlay(value),
-                  onImage: (url: string) => this.onImage(url)
+                  onImage: (url: string) => this.onImage(url),
+                  onOpenQuoted: (id: string) => this.onOpenQuoted(id)
                 })
                 Divider().color('#EFF3F4')
               }
