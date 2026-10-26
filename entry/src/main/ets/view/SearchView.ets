@@ -11,6 +11,7 @@ export struct SearchView {
   onPlay: (item: TweetItem) => void = () => {};
   onImage: (url: string) => void = () => {};
   onOpenQuoted: (id: string) => void = () => {};
+  onOpenUser: (handle: string) => void = () => {};
   @State query: string = '';
   @State tweets: TweetItem[] = [];
   @State loading: boolean = false;
@@ -87,7 +88,8 @@ export struct SearchView {
                   onOpen: (value: TweetItem) => this.onOpen(value),
                   onPlay: (value: TweetItem) => this.onPlay(value),
                   onImage: (url: string) => this.onImage(url),
-                  onOpenQuoted: (id: string) => this.onOpenQuoted(id)
+                  onOpenQuoted: (id: string) => this.onOpenQuoted(id),
+                  onOpenUser: (handle: string) => this.onOpenUser(handle)
                 })
                 Divider().color('#EFF3F4')
               }

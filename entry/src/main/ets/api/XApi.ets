@@ -903,4 +903,49 @@ export class XApi {
     return result;
   }
 
+
+  static async userByScreenName(cookie: string, screenName: string): Promise<UserProfile> {
+    const queryId = await QueryIds.resolve(cookie, 'UserByScreenName');
+    const variables: Record<string, Object> = {
+      'screen_name': screenName,
+      'withSafetyModeUserFields': true
+    };
+    const url = `https://x.com/i/api/graphql/${queryId}/UserByScreenName` +
+      `?variables=${encodeURIComponent(JSON.stringify(variables))}` +
+      `&features=${encodeURIComponent(JSON.stringify(READ_FEATURES))}`;
+    const request = http.createHttp();
+    let text = '';
+    try {
+      const response = await request.request(url, {
+        method: http.RequestMethod.GET,
+        header: XApi.headers(cookie),
+        expectDataType: http.HttpDataType.STRING,
+        connectTimeout: 20000,
+        readTimeout: 20000
+      });
+      if (response.responseCode < 200 || response.responseCode >= 300) {
+        throw new Error(`HTTP ${response.responseCode}`);
+      }
+      text = response.result as string;
+    } finally {
+      request.destroy();
+    }
+    const root = asObj(JSON.parse(text) as Object);
+    const data = asObj(root == null ? null : root['data']);
+    const user = asObj(data == null ? null : data['user']);
+    const result = asObj(user == null ? null : user['result']);
+    const legacy = asObj(result == null ? null : result['legacy']);
+    if (legacy == null) throw new Error('用户不存在');
+    const profile = new UserProfile();
+    profile.id = asString(result == null ? null : result['rest_id']);
+    profile.name = asString(legacy['name']);
+    profile.handle = asString(legacy['screen_name']);
+    profile.description = asString(legacy['description']);
+    profile.avatarUrl = asString(legacy['profile_image_url_https']);
+    profile.bannerUrl = asString(legacy['profile_banner_url']);
+    profile.followers = asNumber(legacy['followers_count']);
+    profile.following = asNumber(legacy['friends_count']);
+    return profile;
+  }
+
 }

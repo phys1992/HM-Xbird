@@ -308,3 +308,12 @@ ArrowTS UI
 - 搜索结果滚动到底自动加载下一页；
 - cursor-bottom 正确解析；
 - 保留 Top 产品类型。
+
+
+## 27. 其他用户主页
+
+- 新增 `UserByScreenName`，queryId 回退 `AMIBMjtxEEATh4z8V9GtRg`；
+- 点击头像/作者打开原生用户主页；
+- 展示 banner、头像、昵称、@handle、简介、关注/粉丝数；
+- 主页内加载该用户最近帖子；
+- 支持继续点击其他作者、打开详情、媒体查看。

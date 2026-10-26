@@ -6,6 +6,7 @@ import { SessionStore } from '../model/SessionStore';
 import { BackDispatcher } from '../model/BackDispatcher';
 import { LoginView } from './LoginView';
 import { NativeLogin } from './NativeLogin';
+import { ProfilePage } from './ProfilePage';
 import { HomeFeed } from './HomeFeed';
 import { SearchView } from './SearchView';
 import { XApi } from '../api/XApi';
@@ -37,6 +38,7 @@ export struct NativeShell {
   @State viewingImage: string = '';
   @State imageScale: number = 1;
   @State showWebLogin: boolean = false;
+  @State profileHandle: string = '';
   @State sheenX: number = -120;
   private videoController: VideoController = new VideoController();
   @StorageLink('memoryTrimTick') @Watch('onMemoryTrim') memoryTick: number = 0;
@@ -85,6 +87,10 @@ export struct NativeShell {
   }
 
   private handleBack(): boolean {
+    if (this.profileHandle.length > 0) {
+      this.profileHandle = '';
+      return true;
+    }
     if (this.viewingImage.length > 0) {
       this.viewingImage = '';
       return true;
@@ -386,7 +392,8 @@ export struct NativeShell {
                 onOpen: (value: TweetItem) => this.openDetail(value),
                 onPlay: (value: TweetItem) => this.playingVideo = value.videoUrl,
                 onImage: (url: string) => { this.imageScale = 1; this.viewingImage = url; },
-                onOpenQuoted: (id: string) => this.openQuoted(id)
+                onOpenQuoted: (id: string) => this.openQuoted(id),
+                onOpenUser: (handle: string) => this.profileHandle = handle
               })
               Divider().color('#EFF3F4')
             }
@@ -479,7 +486,8 @@ export struct NativeShell {
                     onQuote: (value: TweetItem) => this.openQuote(value),
                     onPlay: (value: TweetItem) => this.playingVideo = value.videoUrl,
                     onImage: (url: string) => { this.imageScale = 1; this.viewingImage = url; },
-                    onOpenQuoted: (id: string) => this.openQuoted(id)
+                    onOpenQuoted: (id: string) => this.openQuoted(id),
+                    onOpenUser: (handle: string) => this.profileHandle = handle
                   })
                   Divider().color('#EFF3F4')
                 }
@@ -512,7 +520,8 @@ export struct NativeShell {
           onPrefetch: (item: TweetItem) => this.prefetchDetail(item),
           onPlay: (item: TweetItem) => this.playingVideo = item.videoUrl,
           onImage: (url: string) => { this.imageScale = 1; this.viewingImage = url; },
-          onOpenQuoted: (id: string) => this.openQuoted(id)
+          onOpenQuoted: (id: string) => this.openQuoted(id),
+          onOpenUser: (handle: string) => this.profileHandle = handle
         })
       }.width('100%').height('100%')
       .visibility(this.tab == 0 ? Visibility.Visible : Visibility.None)
@@ -525,7 +534,8 @@ export struct NativeShell {
           onOpen: (item: TweetItem) => this.openDetail(item),
           onPlay: (item: TweetItem) => this.playingVideo = item.videoUrl,
           onImage: (url: string) => { this.imageScale = 1; this.viewingImage = url; },
-          onOpenQuoted: (id: string) => this.openQuoted(id)
+          onOpenQuoted: (id: string) => this.openQuoted(id),
+          onOpenUser: (handle: string) => this.profileHandle = handle
         })
       }.width('100%').height('100%')
       .visibility(this.tab == 1 ? Visibility.Visible : Visibility.None)
@@ -601,6 +611,22 @@ export struct NativeShell {
         .padding({ left: this.barX })
         .justifyContent(FlexAlign.Center)
         .hitTestBehavior(HitTestMode.Transparent)
+
+        if (this.profileHandle.length > 0) {
+          ProfilePage({
+            cookie: this.cookie,
+            handle: this.profileHandle,
+            onClose: () => this.profileHandle = '',
+            onOpenTweet: (item: TweetItem) => this.openDetail(item),
+            onReply: (item: TweetItem) => this.openReply(item),
+            onQuote: (item: TweetItem) => this.openQuote(item),
+            onPlay: (item: TweetItem) => this.playingVideo = item.videoUrl,
+            onImage: (url: string) => { this.imageScale = 1; this.viewingImage = url; },
+            onOpenQuoted: (id: string) => this.openQuoted(id),
+            onOpenUser: (handle: string) => this.profileHandle = handle
+          })
+            .width('100%').height('100%')
+        }
 
         if (this.composing) {
           ComposeView({

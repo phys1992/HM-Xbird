@@ -12,6 +12,7 @@ export struct TweetCard {
   onPlay: (item: TweetItem) => void = () => {};
   onImage: (url: string) => void = () => {};
   onOpenQuoted: (id: string) => void = () => {};
+  onOpenUser: (handle: string) => void = () => {};
   @State liked: boolean = false;
   @State retweeted: boolean = false;
   @State likeCount: number = 0;
@@ -67,7 +68,7 @@ export struct TweetCard {
     Row() {
       if (this.item.avatarUrl.length > 0) {
         Image(this.item.avatarUrl).width(44).height(44).borderRadius(22).margin({ right: 10 })
-          .onClick(() => this.onOpen(this.item))
+          .onClick(() => this.onOpenUser(this.item.authorHandle))
       } else {
         Circle({ width: 44, height: 44 }).fill('#E1E8ED').margin({ right: 10 })
       }
@@ -78,7 +79,7 @@ export struct TweetCard {
             .textOverflow({ overflow: TextOverflow.Ellipsis }).layoutWeight(1)
           Text(`@${this.item.authorHandle} · ${this.shortTime(this.item.createdAt)}`)
             .fontSize(12).fontColor('#536471').margin({ left: 6 })
-        }.width('100%').onClick(() => this.onOpen(this.item))
+        }.width('100%').onClick(() => this.onOpenUser(this.item.authorHandle))
 
         Text(this.item.text)
           .fontSize(15).lineHeight(21).margin({ top: 4 })
