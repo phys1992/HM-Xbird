@@ -7,6 +7,7 @@ export struct HomeFeed {
   cookie: string = '';
   onReply: (item: TweetItem) => void = () => {};
   onQuote: (item: TweetItem) => void = () => {};
+  onOpen: (item: TweetItem) => void = () => {};
   @State tab: number = 1;
   @State tweets: TweetItem[] = [];
   @State loading: boolean = false;
@@ -102,7 +103,8 @@ export struct HomeFeed {
                   item: item,
                   cookie: this.cookie,
                   onReply: (value: TweetItem) => this.onReply(value),
-                  onQuote: (value: TweetItem) => this.onQuote(value)
+                  onQuote: (value: TweetItem) => this.onQuote(value),
+                  onOpen: (value: TweetItem) => this.onOpen(value)
                 })
                 Divider().color('#EFF3F4')
               }

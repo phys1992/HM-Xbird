@@ -8,6 +8,7 @@ export struct TweetCard {
   cookie: string = '';
   onReply: (item: TweetItem) => void = () => {};
   onQuote: (item: TweetItem) => void = () => {};
+  onOpen: (item: TweetItem) => void = () => {};
   @State liked: boolean = false;
   @State retweeted: boolean = false;
   @State likeCount: number = 0;
@@ -63,6 +64,7 @@ export struct TweetCard {
     Row() {
       if (this.item.avatarUrl.length > 0) {
         Image(this.item.avatarUrl).width(44).height(44).borderRadius(22).margin({ right: 10 })
+          .onClick(() => this.onOpen(this.item))
       } else {
         Circle({ width: 44, height: 44 }).fill('#E1E8ED').margin({ right: 10 })
       }
@@ -73,15 +75,17 @@ export struct TweetCard {
             .textOverflow({ overflow: TextOverflow.Ellipsis }).layoutWeight(1)
           Text(`@${this.item.authorHandle} · ${this.shortTime(this.item.createdAt)}`)
             .fontSize(12).fontColor('#536471').margin({ left: 6 })
-        }.width('100%')
+        }.width('100%').onClick(() => this.onOpen(this.item))
 
         Text(this.item.text)
           .fontSize(15).lineHeight(21).margin({ top: 4 })
           .maxLines(10).textOverflow({ overflow: TextOverflow.Ellipsis })
+          .onClick(() => this.onOpen(this.item))
 
         if (this.item.imageUrl.length > 0) {
           Image(this.item.imageUrl).width('100%').aspectRatio(1.7)
             .objectFit(ImageFit.Cover).borderRadius(12).margin({ top: 8 })
+            .onClick(() => this.onOpen(this.item))
         }
 
         Row() {
