@@ -448,4 +448,95 @@ export class XApi {
     return XApi.parseTimeline(timeline);
   }
 
+
+  static async tweetDetail(cookie: string, tweetId: string): Promise<HomeResult> {
+    const queryId = await QueryIds.resolve(cookie, 'TweetDetail');
+    const variables: Record<string, Object> = {
+      'focalTweetId': tweetId,
+      'with_rux_injections': false,
+      'includePromotedContent': false,
+      'withCommunity': true,
+      'withBirdwatchNotes': true,
+      'withVoice': true,
+      'withV2Timeline': true
+    };
+    const fieldToggles: Record<string, Object> = {
+      'withArticleRichContentState': true,
+      'withArticlePlainText': false,
+      'withGrokAnalyze': false,
+      'withDisallowedReplyControls': false
+    };
+    const url = `https://x.com/i/api/graphql/${queryId}/TweetDetail` +
+      `?variables=${encodeURIComponent(JSON.stringify(variables))}` +
+      `&features=${encodeURIComponent(JSON.stringify(READ_FEATURES))}` +
+      `&fieldToggles=${encodeURIComponent(JSON.stringify(fieldToggles))}`;
+    const request = http.createHttp();
+    let text = '';
+    try {
+      const response = await request.request(url, {
+        method: http.RequestMethod.GET,
+        header: XApi.headers(cookie),
+        expectDataType: http.HttpDataType.STRING,
+        connectTimeout: 20000,
+        readTimeout: 20000
+      });
+      if (response.responseCode < 200 || response.responseCode >= 300) {
+        throw new Error(`HTTP ${response.responseCode}`);
+      }
+      text = response.result as string;
+    } finally {
+      request.destroy();
+    }
+
+    const root = asObj(JSON.parse(text) as Object);
+    const data = asObj(root == null ? null : root['data']);
+    const result = new HomeResult();
+
+    // Focal tweet (some query variants return it separately).
+    const tweetResult = asObj(data == null ? null : data['tweetResult']);
+    const focal = asObj(tweetResult == null ? null : tweetResult['result']);
+    if (focal != null) {
+      const tweetResults: Record<string, Object> = { 'result': focal };
+      const itemContent: Record<string, Object> = { 'tweet_results': tweetResults };
+      const content: Record<string, Object> = { 'itemContent': itemContent };
+      const synthetic: Record<string, Object> = { 'content': content };
+      const item = parseTweet(synthetic);
+      if (item != null && item.id.length > 0) result.tweets.push(item);
+    }
+
+    const threaded = asObj(data == null ? null : data['threaded_conversation_with_injections_v2']);
+    const instructions = asArr(threaded == null ? null : threaded['instructions']);
+    for (const rawInstruction of instructions) {
+      const instruction = asObj(rawInstruction);
+      if (instruction == null || asString(instruction['type']) != 'TimelineAddEntries') continue;
+      for (const rawEntry of asArr(instruction['entries'])) {
+        const entry = asObj(rawEntry);
+        if (entry == null) continue;
+        const entryId = asString(entry['entryId']);
+        if (entryId.indexOf('tweet-') >= 0) {
+          const item = parseTweet(entry);
+          if (item != null && item.id.length > 0) result.tweets.push(item);
+          continue;
+        }
+        if (entryId.indexOf('conversationthread-') >= 0) {
+          const content = asObj(entry['content']);
+          for (const rawItem of asArr(content == null ? null : content['items'])) {
+            const wrapped = asObj(rawItem);
+            const inner = asObj(wrapped == null ? null : wrapped['item']);
+            if (inner == null) continue;
+            const synthetic: Record<string, Object> = { 'content': inner };
+            const item = parseTweet(synthetic);
+            if (item != null && item.id.length > 0) {
+              if (!result.tweets.some((t: TweetItem) => t.id == item.id)) result.tweets.push(item);
+            }
+          }
+        }
+      }
+    }
+    if (result.tweets.length == 0) {
+      throw new Error('推文详情为空');
+    }
+    return result;
+  }
+
 }

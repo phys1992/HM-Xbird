@@ -7,6 +7,8 @@ import { BackDispatcher } from '../model/BackDispatcher';
 import { LoginView } from './LoginView';
 import { HomeFeed } from './HomeFeed';
 import { SearchView } from './SearchView';
+import { XApi } from '../api/XApi';
+import { TweetCard } from './TweetCard';
 import { ComposeView } from './ComposeView';
 
 @Component
@@ -17,6 +19,9 @@ export struct NativeShell {
   @State paneWidth: number = 360;
   @State expanded: boolean = false;
   @State selected: TweetItem | null = null;
+  @State detailTweets: TweetItem[] = [];
+  @State detailLoading: boolean = false;
+  @State detailError: string = '';
   @State composing: boolean = false;
   @State replyId: string = '';
   @State replyHandle: string = '';
@@ -53,6 +58,8 @@ export struct NativeShell {
     }
     if (this.selected != null) {
       this.selected = null;
+      this.detailTweets = [];
+      this.detailError = '';
       return true;
     }
     if (this.tab != 0) {
@@ -60,6 +67,21 @@ export struct NativeShell {
       return true;
     }
     return false;
+  }
+
+  private async openDetail(item: TweetItem): Promise<void> {
+    this.selected = item;
+    this.detailTweets = [item];
+    this.detailLoading = true;
+    this.detailError = '';
+    try {
+      const page = await XApi.tweetDetail(this.cookie, item.id);
+      if (page.tweets.length > 0) this.detailTweets = page.tweets;
+    } catch (e) {
+      this.detailError = `${e}`;
+    } finally {
+      this.detailLoading = false;
+    }
   }
 
   private openReply(item: TweetItem): void {
@@ -168,26 +190,52 @@ export struct NativeShell {
       if (this.selected == null) {
         Text('选择左侧推文').fontSize(15).fontColor('#536471')
       } else {
-        Scroll() {
+        Row() {
+          if (!this.expanded) {
+            Button('‹').backgroundColor('#00000000').fontColor('#0F1419').fontSize(22)
+              .onClick(() => {
+                this.selected = null;
+                this.detailTweets = [];
+              })
+          }
+          Text('帖子').fontSize(17).fontWeight(FontWeight.Bold).layoutWeight(1)
+        }.width('100%').height(48).padding({ left: 8, right: 12 })
+
+        if (this.detailError.length > 0) {
           Column() {
-            Row() {
-              Circle({ width: 40, height: 40 }).fill('#E1E8ED')
-              Column() {
-                Text(this.selected!.authorName).fontSize(15).fontWeight(FontWeight.Bold)
-                Text(`@${this.selected!.authorHandle}`).fontSize(12).fontColor('#536471')
-              }.alignItems(HorizontalAlign.Start).margin({ left: 10 })
-            }.width('100%')
-            Text(this.selected!.text).fontSize(16).lineHeight(23).margin({ top: 12 })
-            if (this.selected!.imageUrl.length > 0) {
-              Image(this.selected!.imageUrl).width('100%').aspectRatio(1.7)
-                .objectFit(ImageFit.Cover).borderRadius(12).margin({ top: 12 })
-            }
-            Divider().color('#EFF3F4').margin({ top: 16, bottom: 16 })
-            Text('评论接口将在下一阶段接入').fontSize(13).fontColor('#536471')
-          }.width('100%').padding(16).alignItems(HorizontalAlign.Start)
-        }.layoutWeight(1).width('100%')
+            Text(this.detailError).fontSize(13).fontColor('#F4212E').padding(16)
+            Button('重试').onClick(() => {
+              if (this.selected != null) this.openDetail(this.selected);
+            })
+          }.layoutWeight(1).justifyContent(FlexAlign.Center)
+        } else {
+          List() {
+            ForEach(this.detailTweets, (item: TweetItem) => {
+              ListItem() {
+                Column() {
+                  TweetCard({
+                    item: item,
+                    cookie: this.cookie,
+                    onReply: (value: TweetItem) => this.openReply(value),
+                    onQuote: (value: TweetItem) => this.openQuote(value)
+                  })
+                  Divider().color('#EFF3F4')
+                }
+              }
+            }, (item: TweetItem) => item.id)
+          }
+          .layoutWeight(1).width('100%')
+          .onReachEnd(() => {})
+        }
+
+        if (this.detailLoading) {
+          Row() {
+            LoadingProgress().width(20).height(20)
+            Text('加载评论…').fontSize(12).fontColor('#536471').margin({ left: 8 })
+          }.height(32)
+        }
       }
-    }.width('100%').height('100%').justifyContent(FlexAlign.Center)
+    }.width('100%').height('100%')
   }
 
   @Builder
@@ -197,13 +245,14 @@ export struct NativeShell {
         cookie: this.cookie,
         onReply: (item: TweetItem) => this.openReply(item),
         onQuote: (item: TweetItem) => this.openQuote(item),
-        onOpen: (item: TweetItem) => this.selected = item
+        onOpen: (item: TweetItem) => this.openDetail(item)
       })
     } else if (this.tab == 1) {
       SearchView({
         cookie: this.cookie,
         onReply: (item: TweetItem) => this.openReply(item),
-        onQuote: (item: TweetItem) => this.openQuote(item)
+        onQuote: (item: TweetItem) => this.openQuote(item),
+        onOpen: (item: TweetItem) => this.openDetail(item)
       })
     } else if (this.tab == 2) {
       this.notificationsPage()
