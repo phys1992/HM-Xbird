@@ -237,3 +237,11 @@ ArrowTS UI
 - 我的页显示头像、昵称、@handle、简介、关注/粉丝数；
 - queryId 回退 `mxaYWwt52eAb6OAzYHMVzg`；
 - 分栏开关和退出登录保持原生。
+
+
+## 18. 底栏光感与资料页
+
+- 底栏增加动态光带（`linearGradient` + `blur`，2.6s 往返）；
+- 底栏保持 320vp 悬浮胶囊、模糊、描边、阴影；
+- 我的页加载原生用户资料；
+- queryId 回退支持 UserByRestId。

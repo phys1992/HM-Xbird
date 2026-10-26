@@ -34,6 +34,7 @@ export struct NativeShell {
   @State playingVideo: string = '';
   @State viewingImage: string = '';
   @State showWebLogin: boolean = false;
+  @State sheenX: number = -120;
   private videoController: VideoController = new VideoController();
   @StorageLink('memoryTrimTick') @Watch('onMemoryTrim') memoryTick: number = 0;
   @State expanded: boolean = false;
@@ -58,6 +59,14 @@ export struct NativeShell {
       this.loadProfile();
     }
     this.splitEnabled = SessionStore.loadSplitEnabled(context);
+    animateTo({
+      duration: 2600,
+      curve: Curve.EaseInOut,
+      iterations: -1,
+      playMode: PlayMode.Alternate
+    }, () => {
+      this.sheenX = 300;
+    });
     try {
       this.expanded = display.getFoldStatus() == display.FoldStatus.FOLD_STATUS_EXPANDED;
       display.on('foldStatusChange', (status: number) => {
@@ -250,29 +259,43 @@ export struct NativeShell {
 
   @Builder
   bottomBar() {
-    Row() {
-      this.navItem(0, $r('app.media.ic_home'), '主页')
-      this.navItem(1, $r('app.media.ic_search'), '搜索')
-      Column() {
-        Button() {
-          Image($r('app.media.ic_plus')).width(20).height(20).fillColor('#FFFFFF')
-        }
-        .width(44).height(44).borderRadius(22).backgroundColor('#0F1419')
-        .onClick(() => {
-          this.replyId = '';
-          this.quoteId = '';
-          this.composing = true;
+    Stack({ alignContent: Alignment.Start }) {
+      Row() {
+        this.navItem(0, $r('app.media.ic_home'), '主页')
+        this.navItem(1, $r('app.media.ic_search'), '搜索')
+        Column() {
+          Button() {
+            Image($r('app.media.ic_plus')).width(20).height(20).fillColor('#FFFFFF')
+          }
+          .width(44).height(44).borderRadius(22).backgroundColor('#0F1419')
+          .onClick(() => {
+            this.replyId = '';
+            this.quoteId = '';
+            this.composing = true;
+          })
+        }.layoutWeight(1).height(52).justifyContent(FlexAlign.Center)
+        this.navItem(2, $r('app.media.ic_bell'), '通知')
+        this.navItem(3, $r('app.media.ic_user'), '我的')
+      }
+      .width('100%').height('100%')
+      .padding({ left: 6, right: 6 })
+
+      Row()
+        .width(90).height('100%')
+        .linearGradient({
+          angle: 90,
+          colors: [['#00FFFFFF', 0.0], ['#80FFFFFF', 0.5], ['#00FFFFFF', 1.0]]
         })
-      }.layoutWeight(1).height(52).justifyContent(FlexAlign.Center)
-      this.navItem(2, $r('app.media.ic_bell'), '通知')
-      this.navItem(3, $r('app.media.ic_user'), '我的')
+        .blur(8).opacity(0.5)
+        .offset({ x: this.sheenX })
+        .hitTestBehavior(HitTestMode.None)
     }
     .width(320).height(60).borderRadius(30)
+    .clip(true)
     .backgroundColor('#CCFFFFFF')
     .backgroundBlurStyle(BlurStyle.Thick)
     .border({ width: 1, color: '#99FFFFFF' })
     .shadow({ radius: 18, color: '#26000000', offsetY: 5 })
-    .padding({ left: 6, right: 6 })
     .margin({ bottom: 12 })
   }
 
