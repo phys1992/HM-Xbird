@@ -65,3 +65,23 @@ scripts/build-native.sh
 ## 6. 结论
 
 核心原生链路已经可编译、可运行，主界面不再依赖 ArkWeb；但“完全对齐 0.1.0”仍缺实机验证和视觉打磨，登录 WebView 尚未移除。
+
+
+## 7. 2026-10-27 实机问题修复
+
+现象：原生版提示“为你推荐接口不可用”，主页报：
+
+```
+REST syntax error unexpected text in json empty text
+GraphQL 无法解析 HomeLatestTimeline 的 queryId（已扫描 3 个脚本）
+```
+
+原因与修复：
+
+1. `NativeShell` 启动时只恢复了 Cookie，没有恢复网页登录保存的 GraphQL URL 缓存；
+   - 现在启动时读取 `SessionStore.loadJsUrls` 并调用 `QueryIds.setBundleUrls`；
+   - 网页登录成功后也立即注入缓存。
+2. 网页实际捕获的是 `HomeTimeline` 或 `HomeLatestTimeline` 之一；
+   - 新增 `homeGraphql` 统一入口，两种 operation 互为回退。
+3. REST 空响应没有明确报错；
+   - 现在检测空字符串并抛出“REST 返回空响应”，直接进入 GraphQL。

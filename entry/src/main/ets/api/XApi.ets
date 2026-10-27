@@ -245,6 +245,7 @@ export class XApi {
       request.destroy();
     }
 
+    if (text.trim().length == 0) throw new Error('REST 返回空响应');
     const parsed = JSON.parse(text) as Object;
     const result = new HomeResult();
     for (const raw of asArr(parsed)) {
@@ -263,10 +264,19 @@ export class XApi {
   }
 
   private static async homeLatestGraphql(cookie: string, cursor: string): Promise<HomeResult> {
-    const queryId = await QueryIds.resolve(cookie, 'HomeLatestTimeline');
+    try {
+      return await XApi.homeGraphql(cookie, cursor, 'HomeLatestTimeline', false);
+    } catch (e) {
+      return await XApi.homeGraphql(cookie, cursor, 'HomeTimeline', false);
+    }
+  }
+
+  private static async homeGraphql(cookie: string, cursor: string, operation: string,
+    promoted: boolean): Promise<HomeResult> {
+    const queryId = await QueryIds.resolve(cookie, operation);
     const variables: Record<string, Object> = {
       'count': 20,
-      'includePromotedContent': false,
+      'includePromotedContent': promoted,
       'latestControlAvailable': true,
       'requestContext': 'launch',
       'withCommunity': true
@@ -275,7 +285,7 @@ export class XApi {
       variables['cursor'] = cursor;
     }
 
-    const url = `https://x.com/i/api/graphql/${queryId}/HomeLatestTimeline` +
+    const url = `https://x.com/i/api/graphql/${queryId}/${operation}` +
       `?variables=${encodeURIComponent(JSON.stringify(variables))}` +
       `&features=${encodeURIComponent(JSON.stringify(READ_FEATURES))}`;
 
@@ -473,40 +483,11 @@ export class XApi {
         // Fall through to GraphQL.
       }
     }
-    const queryId = await QueryIds.resolve(cookie, 'HomeTimeline');
-    const variables: Record<string, Object> = {
-      'count': 20,
-      'includePromotedContent': true,
-      'latestControlAvailable': true,
-      'requestContext': 'launch',
-      'withCommunity': true
-    };
-    if (cursor.length > 0) variables['cursor'] = cursor;
-    const url = `https://x.com/i/api/graphql/${queryId}/HomeTimeline` +
-      `?variables=${encodeURIComponent(JSON.stringify(variables))}` +
-      `&features=${encodeURIComponent(JSON.stringify(READ_FEATURES))}`;
-    const request = http.createHttp();
-    let text = '';
     try {
-      const response = await request.request(url, {
-        method: http.RequestMethod.GET,
-        header: XApi.headers(cookie),
-        expectDataType: http.HttpDataType.STRING,
-        connectTimeout: 20000,
-        readTimeout: 20000
-      });
-      if (response.responseCode < 200 || response.responseCode >= 300) {
-        throw new Error(`HTTP ${response.responseCode}`);
-      }
-      text = response.result as string;
-    } finally {
-      request.destroy();
+      return await XApi.homeGraphql(cookie, cursor, 'HomeTimeline', true);
+    } catch (e) {
+      return await XApi.homeGraphql(cookie, cursor, 'HomeLatestTimeline', true);
     }
-    const root = asObj(JSON.parse(text) as Object);
-    const data = asObj(root == null ? null : root['data']);
-    const home = asObj(data == null ? null : data['home']);
-    const timeline = asObj(home == null ? null : home['home_timeline_urt']);
-    return XApi.parseTimeline(timeline);
   }
 
 

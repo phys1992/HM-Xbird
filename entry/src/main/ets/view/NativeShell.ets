@@ -3,6 +3,7 @@ import { common } from '@kit.AbilityKit';
 import { promptAction } from '@kit.ArkUI';
 import { TweetItem } from '../model/TweetItem';
 import { SessionStore } from '../model/SessionStore';
+import { QueryIds } from '../api/QueryIds';
 import { BackDispatcher } from '../model/BackDispatcher';
 import { LoginView } from './LoginView';
 import { NativeLogin } from './NativeLogin';
@@ -57,6 +58,12 @@ export struct NativeShell {
   aboutToAppear(): void {
     BackDispatcher.handler = () => this.handleBack();
     const context = getContext(this) as common.UIAbilityContext;
+    const savedJs = SessionStore.loadJsUrls(context);
+    if (savedJs.length > 2) {
+      try {
+        QueryIds.setBundleUrls(JSON.parse(savedJs) as string[]);
+      } catch (e) {}
+    }
     const saved = SessionStore.loadCookie(context);
     if (saved.length > 0) {
       this.cookie = saved;
@@ -564,6 +571,9 @@ export struct NativeShell {
               const context = getContext(this) as common.UIAbilityContext;
               SessionStore.saveCookie(context, cookie);
               SessionStore.saveJsUrls(context, jsUrls);
+              try {
+                QueryIds.setBundleUrls(JSON.parse(jsUrls) as string[]);
+              } catch (e) {}
               this.cookie = cookie;
               this.loggedIn = true;
               this.showWebLogin = false;
