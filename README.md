@@ -1,77 +1,96 @@
-# tuichuang
+# HM-Xbird
 
-tuichuang 是一个面向 HarmonyOS NEXT 的非官方 X（Twitter）客户端，重点适配华为折叠屏手机。它把 X 网页的完整功能与 HarmonyOS 的原生交互结合起来，在折叠屏展开时提供左右分栏，折叠时保持单栏浏览。
+HM-Xbird 是一个使用 ArkTS / ArkUI 构建的 HarmonyOS 原生应用，面向 HarmonyOS NEXT，提供时间线、搜索、通知、个人资料、发帖、草稿、图片与视频附件等原生界面，并适配折叠屏分栏。
 
-> 本项目为非官方第三方客户端，与 X Corp. 无隶属或合作关系。X、Twitter 及相关标识归其各自权利人所有。
+> 当前版本：**1.0.0**
+>
+> 发布者：**phys1992**
+>
+> 包名：**io.github.phys1992.hmxbird**
+>
+> 开源许可：**MIT**
 
-## 原生重构分支
+本应用为非官方个人项目，与任何商标权利人无隶属或授权关系。
 
-`native-rewrite` 分支正在把 ArkWeb 封装重构为 ArkTS/ArkUI 原生实现。
+## 版本说明
 
-- 状态报告：[docs/native-rewrite-status.md](docs/native-rewrite-status.md)
-- 验证清单：[docs/native-rewrite-verification.md](docs/native-rewrite-verification.md)
-- 构建：`scripts/build-native.sh`
+- **1.0.0**：当前原生重构基线版本，使用 ArkTS / ArkUI 实现主要界面与交互。
+- **0.1.0**：早期 ArkWeb 封装版本，已归档，不再作为当前开发基线。
 
-稳定版仍为 `v0.1.0`，原生分支尚未替换正式版本。
+## 功能
 
-## 用途
+- 主页时间线：为你推荐 / 正在关注；
+- 搜索、趋势、通知；
+- 推文详情、回复、引用、转帖；
+- 个人主页、关注/关注者列表、资料编辑入口；
+- 发帖：文字、表情、图片/视频、系统图片编辑、媒体压缩；
+- 草稿：自动保存、冷启动恢复、单条草稿；
+- 账号：Cookie 登录、网页登录、已保存账号与系统认证；
+- 主题：浅色 / 深色 / 跟随系统；
+- 折叠屏展开时左右分栏，折叠时单栏浏览；
+- 原生悬浮底栏、手势返回、系统标准过渡动画。
 
-- 在 HarmonyOS NEXT 设备上浏览 X 的时间线、推文、评论、搜索和通知；
-- 在华为折叠屏手机（如 Mate X5、X7、XT、XT2 等）上使用分栏浏览；
-- 使用原生悬浮底栏、发帖页和折叠屏自适应布局，减少网页版在折叠屏上的操作不便。
+## 技术架构
 
-## 实现方案
+- ArkTS / ArkUI 原生页面与组件；
+- ArkWeb 仅用于网页登录和官方资料编辑页；
+- 内部 API 封装位于 `entry/src/main/ets/api`；
+- 账号 Cookie 使用 Asset Store Kit 保存，读取前要求系统认证；
+- 主题、草稿、媒体设置使用 Preferences 持久化；
+- 图片处理使用 ImageKit / MediaCompressor。
 
-- 使用 HarmonyOS 原生 ArkTS 构建应用外壳、底部导航、折叠屏分栏和过渡动画；
-- 通过 ArkWeb 加载 X 网页，复用 X 的登录态和完整页面功能；
-- 原生层负责账号登录态保存、页面隐藏、左右分栏、发帖入口和返回手势；
-- 针对折叠屏状态和屏幕宽度自动切换单栏/双栏；
-- 本地缓存已加载页面，并对推文详情做预取，减少重复加载和等待。
+## 构建
 
-## 已实现功能
+环境：
 
-- 登录 X 账号，并在应用内保持登录状态；
-- 主页“为你推荐 / 正在关注”双标签浏览，支持滑动切换；
-- 搜索、通知、个人主页入口；
-- 折叠屏展开时左右分栏：
-  - 左栏浏览时间线；
-  - 右栏显示推文详情与评论；
-- 折叠时单栏浏览，展开/折叠自动切换；
-- 悬浮底部导航栏：
-  - 主页、搜索、发帖、通知、我的；
-  - 选中态提示；
-  - 左右滑动切换位置；
-  - 沉浸光感/模糊效果；
-- 原生发帖页面；
-- 系统返回手势逐层返回；
-- 页面缓存、推文详情预取和内存缓存回收；
-- 折叠/展开与分栏切换过渡动画。
+- HarmonyOS SDK / DevEco Studio；
+- hvigor；
+- Node.js（随 command-line-tools 提供）。
 
-## 安装方法
+构建脚本：
 
-1. 前往本项目的 **Releases** 页面，下载对应版本的 `.hap` 文件；
-2. 使用 **小白调试助手** 安装到 HarmonyOS NEXT 设备：
-   - 项目地址：<https://github.com/likuai2010/auto-installer>
-   - 具体安装步骤、设备要求和签名说明，请以该项目文档为准；
-3. 安装完成后，在设备桌面找到 **tuichuang** 并打开，登录 X 账号即可使用。
+```bash
+scripts/build-native.sh
+```
 
-> 说明：Release 中的 HAP 为未签名构建，安装时可能需要按小白调试助手的指引完成签名或开发者模式配置。请只在可信设备上安装。
+或手动构建：
 
-## 系统要求
+```bash
+hvigorw assembleHap \
+  --mode module \
+  -p module=entry@default \
+  -p product=default \
+  -p buildMode=debug \
+  --no-daemon
+```
 
-- HarmonyOS NEXT 设备；
-- 可正常访问 X 的网络环境；
-- 折叠屏分栏功能需要设备支持折叠状态/角度上报。
+产物：
 
-## 开源协议
+```text
+entry/build/default/outputs/default/HM-Xbird-unsigned.hap
+build-out/native-rewrite/HM-Xbird-1.0.0-unsigned.hap
+```
 
-本项目使用 **MIT License** 开源，详见 [LICENSE](LICENSE)。
+构建脚本会读取 `AppScope/app.json5` 中的版本号并复制产物。
 
-你可以自由使用、修改和分发本项目代码，但需保留版权声明和许可声明。项目按“现状”提供，不对使用后果或第三方服务可用性作担保。
+## 版本与分支
 
-## 已知限制
+- `main`：稳定版本；
+- `develop`：开发版本；
+- `v1.0.0`：首个原生重构 release tag。
 
-- X 网页结构变化可能导致部分界面元素显示异常，需要后续版本适配；
-- 私信、Grok、直播等长尾功能未做专门适配；
-- 第三方客户端可能受 X 服务策略、限流或登录策略影响；
-- 使用非官方客户端存在账号风控风险，请自行评估。
+## 开源许可
+
+本项目使用 [MIT License](LICENSE)。
+
+第三方组件、HarmonyOS / ArkUI 与 OpenHarmony 相关组件遵循其各自许可。
+
+## 发布者
+
+- GitHub：[@phys1992](https://github.com/phys1992)
+- 包名：`io.github.phys1992.hmxbird`
+- 版权：© 2026 phys1992
+
+## 免责声明
+
+本应用为非官方个人项目，与任何商标权利人无隶属、合作或授权关系。使用者应自行遵守所访问平台的服务条款与当地法律法规。

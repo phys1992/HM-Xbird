@@ -33,7 +33,7 @@ hvigorw assembleHap \
   --no-daemon
 
 mkdir -p "$ROOT/build-out/native-rewrite"
-cp -f "entry/build/default/outputs/default/tuichuang-unsigned.hap" \
-  "$ROOT/build-out/native-rewrite/tuichuang-native-${VERSION}-unsigned.hap"
+cp -f "entry/build/default/outputs/default/HM-Xbird-unsigned.hap" \
+  "$ROOT/build-out/native-rewrite/HM-Xbird-${VERSION}-unsigned.hap"
 
-echo "HAP: $ROOT/build-out/native-rewrite/tuichuang-native-${VERSION}-unsigned.hap"
+echo "HAP: $ROOT/build-out/native-rewrite/HM-Xbird-${VERSION}-unsigned.hap"

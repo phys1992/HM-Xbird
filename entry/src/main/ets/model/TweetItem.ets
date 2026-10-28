@@ -11,6 +11,9 @@ export class TweetItem {
   imageUrl: string = '';
   videoUrl: string = '';
   mediaType: string = '';
+  lang: string = '';
+  isReply: boolean = false;
+  isRetweet: boolean = false;
   quotedId: string = '';
   quotedText: string = '';
   quotedAuthorName: string = '';

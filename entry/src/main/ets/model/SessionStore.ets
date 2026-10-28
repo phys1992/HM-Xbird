@@ -7,6 +7,10 @@ const KEY_HANDLE = 'handle';
 const KEY_JS_URLS = 'js_urls';
 const KEY_SPLIT_RATIO = 'split_ratio';
 const KEY_SPLIT_ENABLED = 'split_enabled';
+const KEY_THEME_MODE = 'theme_mode';
+const KEY_IMAGE_LIMIT = 'image_limit_mb';
+const KEY_GIF_LIMIT = 'gif_limit_mb';
+const KEY_MEDIA_QUALITY = 'media_quality';
 
 export class SessionStore {
   private static store: preferences.Preferences | null = null;
@@ -59,6 +63,40 @@ export class SessionStore {
   static loadSplitEnabled(context: common.UIAbilityContext): boolean {
     const value = SessionStore.getStore(context).getSync(KEY_SPLIT_ENABLED, true);
     return typeof value == 'boolean' ? value as boolean : true;
+  }
+
+  static saveThemeMode(context: common.UIAbilityContext, mode: string): void {
+    const store = SessionStore.getStore(context);
+    store.putSync(KEY_THEME_MODE, mode);
+    store.flush();
+  }
+
+  static loadThemeMode(context: common.UIAbilityContext): string {
+    const value = SessionStore.getStore(context).getSync(KEY_THEME_MODE, 'system');
+    return typeof value == 'string' ? value as string : 'system';
+  }
+
+  static saveMediaSettings(context: common.UIAbilityContext, imageLimit: number, gifLimit: number, quality: number): void {
+    const store = SessionStore.getStore(context);
+    store.putSync(KEY_IMAGE_LIMIT, imageLimit);
+    store.putSync(KEY_GIF_LIMIT, gifLimit);
+    store.putSync(KEY_MEDIA_QUALITY, quality);
+    store.flush();
+  }
+
+  static loadImageLimit(context: common.UIAbilityContext): number {
+    const value = SessionStore.getStore(context).getSync(KEY_IMAGE_LIMIT, 5);
+    return typeof value == 'number' ? value as number : 5;
+  }
+
+  static loadGifLimit(context: common.UIAbilityContext): number {
+    const value = SessionStore.getStore(context).getSync(KEY_GIF_LIMIT, 15);
+    return typeof value == 'number' ? value as number : 15;
+  }
+
+  static loadMediaQuality(context: common.UIAbilityContext): number {
+    const value = SessionStore.getStore(context).getSync(KEY_MEDIA_QUALITY, 2);
+    return typeof value == 'number' ? value as number : 2;
   }
 
   static clear(context: common.UIAbilityContext): void {

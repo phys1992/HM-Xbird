@@ -1084,7 +1084,7 @@ export struct WebShell {
         Text('我的').fontSize(18).fontWeight(FontWeight.Bold).layoutWeight(1)
       }.width('100%').height(52).padding({ left: 16, right: 16 })
 
-      Divider().color('#F0F0F0')
+      Divider().strokeWidth(1.5).color('#F0F0F0')
       this.meItem('个人资料', () => {
         this.showMe = false;
         this.openMyProfile();

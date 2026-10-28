@@ -2,6 +2,6 @@
   "apiType": "stageMode",
   "buildOption": {},
   "targets": [
-    { "name": "default", "runtimeOS": "HarmonyOS", "output": { "artifactName": "tuichuang" } }
+    { "name": "default", "runtimeOS": "HarmonyOS", "output": { "artifactName": "HM-Xbird" } }
   ]
 }

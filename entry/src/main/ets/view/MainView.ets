@@ -77,10 +77,10 @@ export struct MainView {
         }.alignItems(HorizontalAlign.Start).margin({ left: 10 })
       }.width('100%').padding(16)
 
-      Divider().color('#EFF3F4')
+      Divider().strokeWidth(1.5).color('#EFF3F4')
       this.drawerItem('个人资料', 'Profile')
       Blank()
-      Divider().color('#EFF3F4')
+      Divider().strokeWidth(1.5).color('#EFF3F4')
       this.drawerItem('设置与隐私', 'Settings')
       Row() {
         Text('退出登录').fontSize(14).fontColor('#F4212E')

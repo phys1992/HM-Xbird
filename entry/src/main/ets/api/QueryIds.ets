@@ -82,9 +82,14 @@ export class QueryIds {
 
     if (QueryIds.bundleUrls.length == 0) {
       const earlyFallback: Map<string, string> = new Map();
-      earlyFallback.set('CreateTweet', 'uY34Pldm6W89yqswRmPMSQ');
-      earlyFallback.set('TweetDetail', 'wjV7NuWEsHgTBFfW3zYKzQ');
-      earlyFallback.set('SearchTimeline', 'BYppgupFFS2yqVmmRNjlsw');
+      earlyFallback.set('CreateTweet', 'a1p9RWpkYKBjWv_I3WzS-A');
+      earlyFallback.set('FavoriteTweet', 'lI07N6Otwv1PhnEgXILM7A');
+      earlyFallback.set('CreateRetweet', 'LFho5rIi4xcKO90p9jwG7A');
+      earlyFallback.set('TweetDetail', '_NvJCnIjOW__EP5-RF197A');
+      earlyFallback.set('SearchTimeline', 'hz_94eVAtrtQo_vO3my7Rw');
+      earlyFallback.set('NotificationsTimeline', '8kmedJD_u653xqEjZIS7yA');
+      earlyFallback.set('HomeTimeline', '0toR0MxC06yY3Fc57GXBpA');
+      earlyFallback.set('HomeLatestTimeline', 'PyccKQwFZpSmD1revPllaA');
       earlyFallback.set('UserByRestId', 'mxaYWwt52eAb6OAzYHMVzg');
       earlyFallback.set('UserTweets', 'OdBLACRZ0-9NikpJotaT7g');
       earlyFallback.set('UserByScreenName', 'AMIBMjtxEEATh4z8V9GtRg');
@@ -148,9 +153,14 @@ export class QueryIds {
     // Known fallbacks for operations the native shell needs even when no
     // authenticated WebView bundle has been captured yet.
     const fallback: Map<string, string> = new Map();
-    fallback.set('CreateTweet', 'uY34Pldm6W89yqswRmPMSQ');
-    fallback.set('TweetDetail', 'wjV7NuWEsHgTBFfW3zYKzQ');
-    fallback.set('SearchTimeline', 'BYppgupFFS2yqVmmRNjlsw');
+    fallback.set('CreateTweet', 'a1p9RWpkYKBjWv_I3WzS-A');
+    fallback.set('FavoriteTweet', 'lI07N6Otwv1PhnEgXILM7A');
+    fallback.set('CreateRetweet', 'LFho5rIi4xcKO90p9jwG7A');
+    fallback.set('TweetDetail', '_NvJCnIjOW__EP5-RF197A');
+    fallback.set('SearchTimeline', 'hz_94eVAtrtQo_vO3my7Rw');
+    fallback.set('NotificationsTimeline', '8kmedJD_u653xqEjZIS7yA');
+    fallback.set('HomeTimeline', '0toR0MxC06yY3Fc57GXBpA');
+    fallback.set('HomeLatestTimeline', 'PyccKQwFZpSmD1revPllaA');
     fallback.set('UserByRestId', 'mxaYWwt52eAb6OAzYHMVzg');
     fallback.set('UserTweets', 'OdBLACRZ0-9NikpJotaT7g');
     fallback.set('UserByScreenName', 'AMIBMjtxEEATh4z8V9GtRg');

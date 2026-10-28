@@ -27,7 +27,7 @@ export struct SettingsView {
           this.selected = index;
           this.foldedDetail = true;
         })
-        Divider().color('#F0F0F0').margin({ left: 16 })
+        Divider().strokeWidth(1.5).color('#F0F0F0').margin({ left: 16 })
       }, (title: string) => title)
     }
     .width('100%')
@@ -57,7 +57,7 @@ export struct SettingsView {
               Text('已通过网页登录').fontSize(12).fontColor('#999999').margin({ top: 2 })
             }.alignItems(HorizontalAlign.Start).margin({ left: 12 })
           }.width('100%').padding(16)
-          Divider().color('#F0F0F0')
+          Divider().strokeWidth(1.5).color('#F0F0F0')
           Row() { Text('添加已有账号').fontSize(15) }.width('100%').padding(16)
             .onClick(() => this.onAddAccount())
           Row() { Text('登出').fontSize(15).fontColor('#E84026') }.width('100%').padding(16)
@@ -105,7 +105,7 @@ export struct SettingsView {
       if (this.wide) {
         Row() {
           Column() { this.list() }.width(300).height('100%')
-          Divider().vertical(true).color('#E5E5E5')
+          Divider().strokeWidth(1.5).vertical(true).color('#E5E5E5')
           Column() { this.detail() }.layoutWeight(1).height('100%')
         }.layoutWeight(1).width('100%')
       } else {

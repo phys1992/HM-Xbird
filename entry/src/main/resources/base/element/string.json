@@ -1,7 +1,7 @@
 {
   "string": [
     { "name": "module_desc", "value": "Native X client" },
-    { "name": "EntryAbility_desc", "value": "tuichuang" },
-    { "name": "EntryAbility_label", "value": "tuichuang" }
+    { "name": "EntryAbility_desc", "value": "HM-Xbird" },
+    { "name": "EntryAbility_label", "value": "HM-Xbird" }
   ]
 }
