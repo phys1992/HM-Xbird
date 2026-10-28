@@ -1,4 +1,4 @@
-# tuichuang（ArkTS 原生，B 方案）
+# HM-Xbird（ArkTS 原生）
 
 不依赖 Flutter 的纯 ArkTS 客户端。当前完成第一里程碑：
 
@@ -15,14 +15,14 @@
 工程路径不能含中文，需要复制到 ASCII 路径构建：
 
 ```bash
-cp -a x-harmony /tmp/xh && cd /tmp/xh
+cp -a HM-Xbird /tmp/HM-Xbird-build && cd /tmp/xh
 export DEVECO_SDK_HOME=/path/to/command-line-tools/sdk
 export PATH=/path/to/command-line-tools/bin:/path/to/command-line-tools/tool/node/bin:$PATH
 hvigorw assembleHap --mode module -p module=entry@default \
   -p product=default -p buildMode=debug --no-daemon
 ```
 
-产物：`entry/build/default/outputs/default/tuichuang-unsigned.hap`（约 78 KB，
+产物：`entry/build/default/outputs/default/HM-Xbird-unsigned.hap`（约 78 KB，
 未签名）。
 
 ## 第二里程碑（2026-10-26）
@@ -50,7 +50,7 @@ hvigorw assembleHap --mode module -p module=entry@default \
 ```bash
 hvigorw assembleHap --mode module -p module=entry@default   -p product=default -p buildMode=debug --no-daemon
 
-cp entry/build/default/outputs/default/tuichuang-unsigned.hap    build-out/tuichuang-<version>-unsigned.hap
+cp entry/build/default/outputs/default/HM-Xbird-unsigned.hap    build-out/HM-Xbird-<version>-unsigned.hap
 ```
 
 然后在 GitHub 仓库的 Releases 页面手动上传 HAP 和用户说明。

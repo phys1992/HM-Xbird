@@ -9,6 +9,8 @@ HM-Xbird 是一个使用 ArkTS / ArkUI 构建的 HarmonyOS 原生应用，面向
 > 包名：**io.github.phys1992.hmxbird**
 >
 > 开源许可：**MIT**
+>
+> 仓库：**https://github.com/phys1992/HM-Xbird**
 
 本应用为非官方个人项目，与任何商标权利人无隶属或授权关系。
 

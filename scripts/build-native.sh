@@ -6,7 +6,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CLI="${CLI:-/home/liandd/Data/项目/command-line-tools}"
-WORK="${WORK:-/tmp/tuichuang-native-build}"
+WORK="${WORK:-/tmp/HM-Xbird-native-build}"
 VERSION="$(python3 - "$ROOT/AppScope/app.json5" <<'PY'
 import re,sys
 s=open(sys.argv[1]).read()
@@ -20,7 +20,7 @@ mkdir -p "$WORK"
 tar --exclude=./.git --exclude=./build --exclude=./build-out --exclude=./releases --exclude=./oh_modules --exclude=./.hvigor -C "$ROOT" -cf - . | tar -C "$WORK" -xf -
 cd "$WORK"
 
-export HOME="${NATIVE_BUILD_HOME:-/tmp/tuichuang-build-home}"
+export HOME="${NATIVE_BUILD_HOME:-/tmp/HM-Xbird-build-home}"
 mkdir -p "$HOME"
 export DEVECO_SDK_HOME="$CLI/sdk"
 export PATH="$CLI/bin:$CLI/tool/node/bin:$CLI/sdk/default/openharmony/toolchains:$PATH"
