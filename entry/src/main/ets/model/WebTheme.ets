@@ -13,8 +13,7 @@ export class WebTheme {
     const colorScheme = dark ? 'dark' : 'light';
     const css = [
       `:root{color-scheme:${colorScheme};--hm-accent:${accent};--hm-muted:${muted};}`,
-      `button,[role="button"]{border-radius:14px!important;}`,
-      `input,textarea{border-radius:14px!important;}`,
+      `input,textarea{border-radius:0!important;}`,
       `a{color:${accent}!important;}`
     ].join('');
     return `(function(){try{var id='hm-web-theme';var old=document.getElementById(id);if(old)old.remove();var s=document.createElement('style');s.id=id;s.textContent=${JSON.stringify(css)};(document.head||document.documentElement).appendChild(s);document.documentElement.style.colorScheme='${colorScheme}';}catch(e){}})();`;

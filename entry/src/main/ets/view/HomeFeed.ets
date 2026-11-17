@@ -1,9 +1,19 @@
 import { TweetItem } from '../model/TweetItem';
 import { XApi, HomeResult, errorText } from '../api/XApi';
 import { TweetCard } from './TweetCard';
+import { VideoAutoplay } from '../model/VideoAutoplay';
+import { I18n } from '../model/I18n';
+import { FollowStatusStore } from '../model/FollowStatusStore';
+import { HomeTimelineCache, HomeTimelineSnapshot } from '../model/HomeTimelineCache';
+import { common } from '@kit.AbilityKit';
 
 @Component
 struct TimelinePage {
+  @StorageProp('clientLang') clientLanguage: string = 'zh';
+  private tr(value: string): string {
+    return this.clientLanguage.length >= 0 ? I18n.t(value) : I18n.t(value);
+  }
+
   mode: number = 0;
   bottomInset: number = 76;
   @Prop @Watch('onScrollTopRequested') scrollTopTick: number = 0;
@@ -12,6 +22,7 @@ struct TimelinePage {
   onFirstLoaded: () => void = () => {};
   onReady: () => void = () => {};
   cookie: string = '';
+  viewerHandle: string = '';
   onReply: (item: TweetItem) => void = () => {};
   onQuote: (item: TweetItem) => void = () => {};
   onOpen: (item: TweetItem) => void = () => {};
@@ -31,13 +42,27 @@ struct TimelinePage {
   private firstVisibleIndex: number = 0;
   private restoring: boolean = false;
   private announced: boolean = false;
+  private followChecked: Record<string, boolean> = {};
 
   private storageKey(): string {
     return this.mode == 0 ? 'tuichuang_foryou_offset' : 'tuichuang_following_offset';
   }
 
   aboutToAppear(): void {
-    if (this.active) this.load(false);
+    this.loadCached();
+    if (this.active && this.tweets.length == 0) this.load(false);
+  }
+
+  private loadCached(): void {
+    const snapshot = HomeTimelineCache.load(getContext(this) as common.UIAbilityContext, this.mode);
+    if (snapshot.tweets.length == 0) return;
+    this.tweets = snapshot.tweets;
+    this.cursor = snapshot.cursor;
+    this.resolveFollowStates();
+    if (!this.announced) {
+      this.announced = true;
+      this.onFirstLoaded();
+    }
   }
 
   onScrollTopRequested(): void {
@@ -59,13 +84,14 @@ struct TimelinePage {
   }
 
   onActiveChanged(): void {
-    if (this.active && this.tweets.length == 0 && !this.loading) this.load(false);
+    if (this.active && this.tweets.length == 0 && !this.loading) {
+      this.loadCached();
+      if (this.tweets.length == 0) this.load(false);
+    }
   }
 
   onPreloadChanged(): void {
-    if (this.preload && !this.active && this.tweets.length == 0 && !this.loading) {
-      this.load(false);
-    }
+    if (this.preload && this.tweets.length == 0) this.loadCached();
   }
 
   private async fetchFirst(): Promise<HomeResult> {
@@ -73,11 +99,34 @@ struct TimelinePage {
       try {
         return await XApi.forYou(this.cookie, '');
       } catch (e) {
-        this.notice = '“为你推荐”暂不可用，已显示关注时间线';
+        this.notice = this.tr('“为你推荐”暂不可用，已显示关注时间线');
         return await XApi.homeLatest(this.cookie, '');
       }
     }
     return await XApi.homeLatest(this.cookie, '');
+  }
+
+  private resolveFollowStates(): void {
+    const handles: string[] = [];
+    for (const tweet of this.tweets) {
+      const handle = tweet.authorHandle;
+      if (handle.length > 0 && this.followChecked[handle] == undefined && handles.indexOf(handle) < 0) {
+        handles.push(handle);
+      }
+    }
+    if (handles.length == 0) return;
+    for (const handle of handles) this.followChecked[handle] = true;
+    XApi.followStates(this.cookie, handles).then((states: Record<string, boolean>) => {
+      const known: Record<string, boolean> = {};
+      let count = 0;
+      for (const handle of handles) {
+        if (states[handle] != undefined) {
+          known[handle] = states[handle];
+          count += 1;
+        }
+      }
+      if (count > 0) FollowStatusStore.set(known);
+    }).catch(() => {});
   }
 
   private async load(more: boolean): Promise<void> {
@@ -93,7 +142,12 @@ struct TimelinePage {
         page = await this.fetchFirst();
       }
       this.tweets = more ? this.tweets.concat(page.tweets) : page.tweets;
+      this.resolveFollowStates();
       this.cursor = page.cursor;
+      if (!more) {
+        HomeTimelineCache.save(getContext(this) as common.UIAbilityContext,
+          this.mode, this.tweets, this.cursor);
+      }
       if (!more) {
         const saved = AppStorage.get<number>(this.storageKey()) ?? 0;
         this.scrollOffset = saved;
@@ -130,8 +184,11 @@ struct TimelinePage {
         const anchor = this.firstVisibleIndex;
         this.restoring = true;
         this.tweets = fresh.concat(this.tweets);
+        this.resolveFollowStates();
         // Wait for Refresh to finish its pull-back, then reveal the bottom of
         // the newly inserted block with the system smooth-scroll animation.
+        HomeTimelineCache.save(getContext(this) as common.UIAbilityContext,
+          this.mode, this.tweets, this.cursor);
         setTimeout(() => {
           this.listScroller.scrollToIndex(anchor + fresh.length, false, ScrollAlign.START);
           setTimeout(() => {
@@ -142,7 +199,7 @@ struct TimelinePage {
         }, 0);
       }
     } catch (e) {
-      this.notice = `刷新失败：${e}`;
+      this.notice = this.tr(`刷新失败：${e}`);
     } finally {
       this.refreshing = false;
     }
@@ -158,7 +215,7 @@ struct TimelinePage {
       if (this.error.length > 0) {
         Column() {
           Text(this.error).fontSize(13).fontColor('#F4212E').padding(16)
-          Button('重试').onClick(() => this.load(false))
+          Button(this.tr('重试')).onClick(() => this.load(false))
         }.layoutWeight(1).justifyContent(FlexAlign.Center)
       } else if (this.loading && this.tweets.length == 0) {
         Column() {
@@ -166,12 +223,12 @@ struct TimelinePage {
         }.layoutWeight(1).justifyContent(FlexAlign.Center)
       } else if (this.tweets.length == 0) {
         Column() {
-          Text('暂无内容').fontSize(14).fontColor($r('app.color.text_secondary'))
+          Text(this.tr('暂无内容')).fontSize(14).fontColor($r('app.color.text_secondary'))
         }.layoutWeight(1).justifyContent(FlexAlign.Center)
       } else {
         Refresh({ refreshing: this.refreshing }) {
           List({ scroller: this.listScroller }) {
-            ForEach(this.tweets, (item: TweetItem) => {
+            ForEach(this.tweets, (item: TweetItem, index: number) => {
               ListItem() {
                 Column() {
                   TweetCard({
@@ -183,7 +240,11 @@ struct TimelinePage {
                     onPlay: (value: TweetItem, startTime: number) => this.onPlay(value, startTime),
                     onImage: (url: string) => this.onImage(url),
                     onOpenQuoted: (id: string) => this.onOpenQuoted(id),
-                    onOpenUser: (handle: string) => this.onOpenUser(handle)
+                    onOpenUser: (handle: string) => this.onOpenUser(handle),
+                    viewerHandle: this.viewerHandle,
+                    showFollow: true,
+                    videoPane: 'left',
+                    videoIndex: index
                   })
                   Divider().strokeWidth(1).color($r('app.color.divider'))
                 }
@@ -198,7 +259,7 @@ struct TimelinePage {
             ListItem() {
               Row() {
                 LoadingProgress().width(18).height(18)
-                Text('加载更多…').fontSize(12).fontColor($r('app.color.text_secondary')).margin({ left: 6 })
+                Text(this.tr('加载更多…')).fontSize(12).fontColor($r('app.color.text_secondary')).margin({ left: 6 })
               }.width('100%').justifyContent(FlexAlign.Center).padding(12)
             }
           }
@@ -208,6 +269,8 @@ struct TimelinePage {
           .onScrollIndex((start: number) => {
             this.firstVisibleIndex = start;
           })
+          .onScrollStart(() => VideoAutoplay.onScrollStart())
+          .onScrollStop(() => VideoAutoplay.onScrollStop())
           .onScroll((offset: number) => {
             if (this.restoring) return;
             this.scrollOffset = Math.max(0, this.scrollOffset + offset);
@@ -232,9 +295,15 @@ struct TimelinePage {
 
 @Component
 export struct HomeFeed {
+  @StorageProp('clientLang') clientLanguage: string = 'zh';
+  private tr(value: string): string {
+    return this.clientLanguage.length >= 0 ? I18n.t(value) : I18n.t(value);
+  }
+
   bottomInset: number = 76;
   @Prop scrollTopTick: number = 0;
   cookie: string = '';
+  viewerHandle: string = '';
   onReady: () => void = () => {};
   onReply: (item: TweetItem) => void = () => {};
   onQuote: (item: TweetItem) => void = () => {};
@@ -245,25 +314,59 @@ export struct HomeFeed {
   onOpenQuoted: (id: string) => void = () => {};
   onOpenUser: (handle: string) => void = () => {};
   @State homeIndex: number = 0;
+  @State displayIndex: number = 0;
+  @State indicatorX: number = 0;
+  @State tabBarW: number = 0;
   @State preloadFollowing: boolean = false;
   private preloadScheduled: boolean = false;
   private controller: SwiperController = new SwiperController();
+  private readonly indicatorW: number = 44;
 
   @Builder
   tabItem(index: number, title: string) {
     Column() {
-      Text(title).fontSize(15)
-        .fontWeight(this.homeIndex == index ? FontWeight.Bold : FontWeight.Normal)
-        .fontColor(this.homeIndex == index ? $r('app.color.text_primary') : $r('app.color.text_secondary'))
-      Rect({ width: 44, height: 3 })
-        .fill(this.homeIndex == index ? $r('app.color.accent') : '#00000000')
-        .radius(2).margin({ top: 4 })
+      Text(this.tr(title)).fontSize(15)
+        .fontWeight(this.displayIndex == index ? FontWeight.Bold : FontWeight.Normal)
+        .fontColor(this.displayIndex == index ? $r('app.color.text_primary') : $r('app.color.text_secondary'))
     }
-    .layoutWeight(1).padding({ top: 4 })
-    .onClick(() => {
-      this.homeIndex = index;
-      this.controller.changeIndex(index, true);
-    })
+    .layoutWeight(1).height(44).justifyContent(FlexAlign.Center)
+    .onClick(() => this.switchTab(index))
+  }
+
+  private tabLeft(index: number): number {
+    if (this.tabBarW <= 0) return 0;
+    const slot = this.tabBarW / 2;
+    return index * slot + (slot - this.indicatorW) / 2;
+  }
+
+  private animateIndicatorTo(index: number, duration: number): void {
+    const target = this.tabLeft(index);
+    if (duration <= 0) {
+      this.indicatorX = target;
+      return;
+    }
+    animateTo({ duration: duration, curve: Curve.EaseOut }, () => {
+      this.indicatorX = target;
+    });
+  }
+
+  private updateSwipeIndicator(index: number, offset: number): void {
+    if (this.tabBarW <= 0) return;
+    const slot = this.tabBarW / 2;
+    const ratio = Math.min(1, Math.abs(offset) / this.tabBarW);
+    let next = index;
+    if (offset < 0 && index < 1) next = index + 1;
+    else if (offset > 0 && index > 0) next = index - 1;
+    const fraction = index + (next - index) * ratio;
+    this.indicatorX = fraction * slot + (slot - this.indicatorW) / 2;
+    this.displayIndex = ratio > 0.5 ? next : index;
+  }
+
+  private switchTab(index: number): void {
+    this.displayIndex = index;
+    this.homeIndex = index;
+    this.animateIndicatorTo(index, 280);
+    this.controller.changeIndex(index, true);
   }
 
   private schedulePreload(): void {
@@ -276,10 +379,24 @@ export struct HomeFeed {
 
   build() {
     Column() {
-      Row() {
-        this.tabItem(0, '为你推荐')
-        this.tabItem(1, '正在关注')
-      }.width('100%')
+      Stack({ alignContent: Alignment.BottomStart }) {
+        Row() {
+          this.tabItem(0, '为你推荐')
+          this.tabItem(1, '正在关注')
+        }.width('100%').height(44)
+        .onAreaChange((oldValue: Area, newValue: Area) => {
+          const w = parseFloat(`${newValue.width}`);
+          if (!isNaN(w) && w > 0) {
+            this.tabBarW = w;
+            this.indicatorX = this.tabLeft(this.displayIndex);
+          }
+        })
+
+        Rect({ width: this.indicatorW, height: 3 })
+          .fill($r('app.color.accent'))
+          .radius(2)
+          .position({ x: this.indicatorX, y: 41 })
+      }.width('100%').height(44)
 
       Swiper(this.controller) {
         TimelinePage({
@@ -290,6 +407,7 @@ export struct HomeFeed {
           preload: false,
           onFirstLoaded: () => { this.schedulePreload(); this.onReady(); },
           cookie: this.cookie,
+          viewerHandle: this.viewerHandle,
           onReply: (item: TweetItem) => this.onReply(item),
           onQuote: (item: TweetItem) => this.onQuote(item),
           onOpen: (item: TweetItem) => this.onOpen(item),
@@ -307,6 +425,7 @@ export struct HomeFeed {
           preload: this.preloadFollowing,
           onFirstLoaded: () => {},
           cookie: this.cookie,
+          viewerHandle: this.viewerHandle,
           onReply: (item: TweetItem) => this.onReply(item),
           onQuote: (item: TweetItem) => this.onQuote(item),
           onOpen: (item: TweetItem) => this.onOpen(item),
@@ -318,7 +437,23 @@ export struct HomeFeed {
         })
       }
       .index(this.homeIndex)
-      .onChange((index: number) => { this.homeIndex = index; })
+      .onChange((index: number) => {
+        this.homeIndex = index;
+        this.displayIndex = index;
+        if (this.tabBarW > 0) this.indicatorX = this.tabLeft(index);
+      })
+      .onAnimationStart((index: number, targetIndex: number, event: SwiperAnimationEvent) => {
+        this.displayIndex = targetIndex;
+        this.animateIndicatorTo(targetIndex, 280);
+      })
+      .onGestureSwipe((index: number, event: SwiperAnimationEvent) => {
+        this.updateSwipeIndicator(index, event.currentOffset);
+      })
+      .onAnimationEnd((index: number, event: SwiperAnimationEvent) => {
+        this.homeIndex = index;
+        this.displayIndex = index;
+        this.indicatorX = this.tabLeft(index);
+      })
       .indicator(false)
       .loop(false)
       .duration(280)

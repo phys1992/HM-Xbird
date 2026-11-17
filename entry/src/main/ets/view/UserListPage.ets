@@ -1,12 +1,21 @@
 import { UserProfile } from '../model/UserProfile';
 import { XApi } from '../api/XApi';
+import { I18n } from '../model/I18n';
+import { SettingsPageHeader } from './SettingsPageHeader';
+import { RelationStore } from '../model/RelationStore';
 
 @Component
 export struct UserListPage {
+  @StorageProp('clientLang') clientLanguage: string = 'zh';
+  @StorageProp('relationsRevision') @Watch('onRelationsRevision') relationsRevision: number = 0;
+  private tr(value: string): string {
+    return this.clientLanguage.length >= 0 ? I18n.t(value) : I18n.t(value);
+  }
+
   cookie: string = '';
   userId: string = '';
   kind: string = 'followers';
-  title: string = '关注者';
+  title: string = this.tr('关注者');
   onClose: () => void = () => {};
   onOpenUser: (handle: string) => void = () => {};
   @State users: UserProfile[] = [];
@@ -16,6 +25,16 @@ export struct UserListPage {
 
   aboutToAppear(): void {
     this.load(false);
+  }
+
+  onRelationsRevision(): void {
+    if (this.userId != RelationStore.viewerId) return;
+    const list = RelationStore.get(this.kind);
+    if (list.length > 0) {
+      this.users = list;
+      this.loading = false;
+      this.error = '';
+    }
   }
 
   private async load(more: boolean): Promise<void> {
@@ -68,16 +87,11 @@ export struct UserListPage {
 
   build() {
     Column() {
-      Row() {
-        Button() {
-          Text('‹').fontSize(26).fontColor($r('app.color.text_primary'))
-        }
-        .width(40).height(40).borderRadius(20)
-        .backgroundColor($r('app.color.surface'))
-        .onClick(() => this.onClose())
-        Text(this.title).fontSize(20).fontWeight(FontWeight.Bold)
-          .fontColor($r('app.color.text_primary')).margin({ left: 14 }).layoutWeight(1)
-      }.width('100%').padding({ left: 16, right: 16, top: 8, bottom: 10 })
+      SettingsPageHeader({
+        title: this.title,
+        showBack: true,
+        onBack: () => this.onClose()
+      })
 
       if (this.loading && this.users.length == 0) {
         Column() { LoadingProgress().width(30).height(30) }
@@ -85,10 +99,10 @@ export struct UserListPage {
       } else if (this.error.length > 0 && this.users.length == 0) {
         Column() {
           Text(this.error).fontSize(13).fontColor('#F4212E').padding(16)
-          Button('重试').onClick(() => this.load(false))
+          Button(this.tr('重试')).onClick(() => this.load(false))
         }.layoutWeight(1).width('100%').justifyContent(FlexAlign.Center)
       } else if (this.users.length == 0) {
-        Text('暂无用户').fontSize(14).fontColor($r('app.color.text_secondary'))
+        Text(this.tr('暂无用户')).fontSize(14).fontColor($r('app.color.text_secondary'))
           .width('100%').textAlign(TextAlign.Center).layoutWeight(1)
       } else {
         List() {

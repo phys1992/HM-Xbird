@@ -1,16 +1,22 @@
 import { webview } from '@kit.ArkWeb';
 import { WebTheme } from '../model/WebTheme';
 import { SessionStore } from '../model/SessionStore';
+import { I18n } from '../model/I18n';
 
 const CAPTURE_SCRIPT = ``;
 
 @Component
 export struct LoginView {
+  @StorageProp('clientLang') clientLanguage: string = 'zh';
+  private tr(value: string): string {
+    return this.clientLanguage.length >= 0 ? I18n.t(value) : I18n.t(value);
+  }
+
   controller: webview.WebviewController = new webview.WebviewController();
   onLoggedIn: (cookie: string, jsUrls: string, save: boolean) => void = () => {};
   onManualLogin: () => void = () => {};
   onBack: () => void = () => {};
-  @State status: string = '请在下方登录 X，成功后点“完成”';
+  @State status: string = this.tr('请在下方登录 X，成功后点“完成”');
   @State busy: boolean = false;
   @State saveAccount: boolean = true;
   @StorageProp('tuichuang_dark') isDarkTheme: boolean = false;
@@ -21,15 +27,15 @@ export struct LoginView {
     try {
       const cookie = await webview.WebCookieManager.fetchCookie('https://x.com');
       if (SessionStore.cookieValue(cookie, 'auth_token').length == 0) {
-        this.status = '还没拿到 auth_token，请确认已经登录成功';
+        this.status = this.tr('还没拿到 auth_token，请确认已经登录成功');
         return;
       }
       await new Promise<void>((resolve) => setTimeout(resolve, 800));
       let captured = this.capturedUrls.length > 0 ? JSON.stringify(this.capturedUrls) : '[]';
-      this.status = captured.length > 2 ? '已捕获接口请求与 Cookie' : '未捕获到接口请求，将尝试扫描脚本';
+      this.status = captured.length > 2 ? this.tr('已捕获接口请求与 Cookie') : this.tr('未捕获到接口请求，将尝试扫描脚本');
       this.onLoggedIn(cookie, captured.length > 2 ? captured : '[]', this.saveAccount);
     } catch (e) {
-      this.status = `读取 Cookie 失败：${e}`;
+      this.status = this.tr(`读取 Cookie 失败：${e}`);
     } finally {
       this.busy = false;
     }
@@ -38,9 +44,9 @@ export struct LoginView {
   build() {
     Column() {
       Row() {
-        Text('网页登录').fontSize(22).fontWeight(FontWeight.Bold)
+        Text(this.tr('网页登录')).fontSize(22).fontWeight(FontWeight.Bold)
           .fontColor($r('app.color.text_primary')).layoutWeight(1)
-        Button(this.busy ? '处理中…' : '完成')
+        Button(this.busy ? this.tr('处理中…') : this.tr('完成'))
           .height(34).fontSize(13)
           .enabled(!this.busy)
           .onClick(() => this.finish())
@@ -52,7 +58,7 @@ export struct LoginView {
         .width('100%').padding({ left: 20, right: 20, bottom: 8 })
 
       Row() {
-        Text('保存此账号').fontSize(16).fontColor($r('app.color.text_primary')).layoutWeight(1)
+        Text(this.tr('保存此账号')).fontSize(16).fontColor($r('app.color.text_primary')).layoutWeight(1)
         Toggle({ type: ToggleType.Switch, isOn: this.saveAccount })
           .onChange((value: boolean) => this.saveAccount = value)
       }
@@ -92,7 +98,7 @@ export struct LoginView {
           console.info(`XHLogin end ${event.url}`);
           this.controller.runJavaScript(WebTheme.script(this.isDarkTheme)).catch(() => {});
           if (event.url.indexOf('/home') >= 0) {
-            this.status = '已到主页，点“完成”保存登录';
+            this.status = this.tr('已到主页，点“完成”保存登录');
           }
           const probe = 'JSON.stringify({url:location.href,title:document.title,inputs:Array.from(document.querySelectorAll("input")).map(function(i){return {v:String(i.value).slice(0,30),t:i.type};}),buttons:Array.from(document.querySelectorAll("button")).slice(0,12).map(function(b){return {t:String(b.innerText||"").trim().slice(0,30),d:!!b.disabled};})})';
           this.controller.runJavaScript(probe).then((value: string) => {
@@ -105,13 +111,13 @@ export struct LoginView {
           const message = event.message.getMessage();
           console.info(`XHLoginConsole ${message}`);
           if (message.indexOf('Uncaught') >= 0 || message.indexOf('error') >= 0) {
-            this.status = `页面 JS 错误：${message}`;
+            this.status = this.tr(`页面 JS 错误：${message}`);
           }
           return false;
         })
         .onErrorReceive((event) => {
           console.info(`XHLoginError ${event.error.getErrorInfo()} ${event.request.getRequestUrl()}`);
-          this.status = `资源加载失败：${event.error.getErrorInfo()}`;
+          this.status = this.tr(`资源加载失败：${event.error.getErrorInfo()}`);
         })
         .onHttpErrorReceive((event) => {
           console.info(`XHLoginHttp ${event.response.getResponseCode()} ${event.request.getRequestUrl()}`);

@@ -12,6 +12,15 @@ export class UserProfile {
   location: string = '';
   website: string = '';
   birthDate: string = '';
+  isFollowing: boolean = false;
+  isSelf: boolean = false;
+  cachedAt: number = 0;
+  avatarSource: string = '';
+  bannerSource: string = '';
+  avatarPath: string = '';
+  bannerPath: string = '';
+  avatarBytes: number = 0;
+  bannerBytes: number = 0;
 }
 
 export class UserSearchResult {

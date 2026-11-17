@@ -1,7 +1,13 @@
 import { SavedAccount } from '../model/AccountStore';
+import { I18n } from '../model/I18n';
 
 @Component
 export struct NativeLogin {
+  @StorageProp('clientLang') clientLanguage: string = 'zh';
+  private tr(value: string): string {
+    return this.clientLanguage.length >= 0 ? I18n.t(value) : I18n.t(value);
+  }
+
   onLoggedIn: (cookie: string, save: boolean) => void = () => {};
   onWebLogin: () => void = () => {};
   savedAccounts: SavedAccount[] = [];
@@ -22,11 +28,11 @@ export struct NativeLogin {
     const auth = this.authToken.trim();
     const csrf = this.csrfToken.trim();
     if (auth.length == 0 || csrf.length == 0) {
-      this.error = '请分别填写 auth_token 和 ct0';
+      this.error = this.tr('请分别填写 auth_token 和 ct0');
       return;
     }
     if (auth.indexOf(';') >= 0 || csrf.indexOf(';') >= 0) {
-      this.error = 'auth_token 和 ct0 中不能包含分号';
+      this.error = this.tr('auth_token 和 ct0 中不能包含分号');
       return;
     }
     this.error = '';
@@ -35,7 +41,7 @@ export struct NativeLogin {
 
   @Builder
   pageHeader(title: string) {
-    Text(title).fontSize(22).fontWeight(FontWeight.Bold)
+    Text(this.tr(title)).fontSize(22).fontWeight(FontWeight.Bold)
       .fontColor($r('app.color.text_primary'))
       .width('100%').margin({ bottom: 18 })
   }
@@ -46,7 +52,7 @@ export struct NativeLogin {
       Column() {
         Text(title).fontSize(17).fontWeight(FontWeight.Medium)
           .fontColor(enabled ? $r('app.color.text_primary') : $r('app.color.text_secondary'))
-        Text(subtitle).fontSize(12).fontColor($r('app.color.text_secondary')).margin({ top: 3 })
+        Text(this.tr(subtitle)).fontSize(12).fontColor($r('app.color.text_secondary')).margin({ top: 3 })
       }.alignItems(HorizontalAlign.Start).layoutWeight(1)
       Text('›').fontSize(20).fontColor($r('app.color.text_secondary'))
     }
@@ -60,9 +66,9 @@ export struct NativeLogin {
   @Builder
   homePage() {
     Column() {
-      Text('登录 X').fontSize(28).fontWeight(FontWeight.Bold)
+      Text(this.tr('登录 X')).fontSize(28).fontWeight(FontWeight.Bold)
         .fontColor($r('app.color.text_primary')).width('100%').margin({ bottom: 6 })
-      Text('选择一种登录方式').fontSize(13).fontColor($r('app.color.text_secondary'))
+      Text(this.tr('选择一种登录方式')).fontSize(13).fontColor($r('app.color.text_secondary'))
         .width('100%').margin({ bottom: 22 })
       this.entryRow('继续使用已保存账号',
         this.savedAccounts.length > 0 ? `已保存 ${this.savedAccounts.length} 个账号` : '暂无保存的账号',
@@ -92,14 +98,14 @@ export struct NativeLogin {
             Text(`@${account.handle}`).fontSize(12)
               .fontColor($r('app.color.text_secondary')).margin({ top: 2 })
           }.alignItems(HorizontalAlign.Start).layoutWeight(1).margin({ left: 10 })
-          Text('使用 ›').fontSize(13).fontColor($r('app.color.accent'))
+          Text(this.tr('使用 ›')).fontSize(13).fontColor($r('app.color.accent'))
         }
         .width('100%').padding(12)
         .backgroundColor($r('app.color.surface')).borderRadius(16)
         .margin({ bottom: 8 })
         .onClick(() => this.onUseSaved(account))
       }, (account: SavedAccount) => account.id)
-      Text('使用保存账号需要先通过系统指纹、人脸或锁屏密码认证。')
+      Text(this.tr('使用保存账号需要先通过系统指纹、人脸或锁屏密码认证。'))
         .fontSize(12).fontColor($r('app.color.text_secondary')).width('100%').margin({ top: 12 })
     }
     .width('100%').alignItems(HorizontalAlign.Start)
@@ -114,7 +120,7 @@ export struct NativeLogin {
       Column() {
         Text('auth_token').fontSize(13).fontColor($r('app.color.text_secondary'))
           .width('100%').margin({ bottom: 8 })
-        TextInput({ placeholder: '粘贴 auth_token 的值', text: this.authToken })
+        TextInput({ placeholder: this.tr('粘贴 auth_token 的值'), text: this.authToken })
           .width('100%').height(46)
           .fontColor($r('app.color.text_primary'))
           .backgroundColor($r('app.color.surface_secondary'))
@@ -122,7 +128,7 @@ export struct NativeLogin {
 
         Text('ct0').fontSize(13).fontColor($r('app.color.text_secondary'))
           .width('100%').margin({ top: 18, bottom: 8 })
-        TextInput({ placeholder: '粘贴 ct0 的值', text: this.csrfToken })
+        TextInput({ placeholder: this.tr('粘贴 ct0 的值'), text: this.csrfToken })
           .width('100%').height(46)
           .fontColor($r('app.color.text_primary'))
           .backgroundColor($r('app.color.surface_secondary'))
@@ -134,19 +140,19 @@ export struct NativeLogin {
         Text(this.error).fontSize(12).fontColor('#F4212E').margin({ top: 8 }).width('100%')
       }
       Row() {
-        Text('保存此账号').fontSize(16).fontColor($r('app.color.text_primary')).layoutWeight(1)
+        Text(this.tr('保存此账号')).fontSize(16).fontColor($r('app.color.text_primary')).layoutWeight(1)
         Toggle({ type: ToggleType.Switch, isOn: this.saveAccount })
           .onChange((value: boolean) => this.saveAccount = value)
       }.width('100%').padding(16).margin({ top: 12 })
       .backgroundColor($r('app.color.surface')).borderRadius(16)
-      Button('导入 Cookie 并登录')
+      Button(this.tr('导入 Cookie 并登录'))
         .width('100%').height(44).margin({ top: 12 })
         .backgroundColor($r('app.color.accent')).fontColor('#FFFFFF')
         .onClick(() => this.submit())
       Column() {
-        Text('如何获取 Cookie').fontSize(13).fontWeight(FontWeight.Bold)
+        Text(this.tr('如何获取 Cookie')).fontSize(13).fontWeight(FontWeight.Bold)
           .fontColor($r('app.color.text_primary')).width('100%')
-        Text('1. 浏览器登录 x.com；\n2. 开发者工具 → Application → Cookies → x.com；\n3. 分别复制 auth_token 和 ct0 的值，填入上方两个输入框。')
+        Text(this.tr('1. 浏览器登录 x.com；\n2. 开发者工具 → Application → Cookies → x.com；\n3. 分别复制 auth_token 和 ct0 的值，填入上方两个输入框。'))
           .fontSize(12).fontColor($r('app.color.text_secondary')).lineHeight(18).margin({ top: 6 }).width('100%')
       }
       .margin({ top: 22, bottom: 24 }).padding(12).borderRadius(14)

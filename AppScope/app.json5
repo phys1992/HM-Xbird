@@ -2,8 +2,8 @@
   "app": {
     "bundleName": "io.github.phys1992.hmxbird",
     "vendor": "squawker",
-    "versionCode": 1000000,
-    "versionName": "1.0.0",
+    "versionCode": 1010000,
+    "versionName": "1.1.0",
     "icon": "$media:app_icon",
     "label": "$string:app_name"
   }

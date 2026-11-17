@@ -6,6 +6,7 @@ import { UserProfile, UserSearchResult } from '../model/UserProfile';
 import { TrendItem } from '../model/TrendItem';
 import { fileIo } from '@kit.CoreFileKit';
 import { util } from '@kit.ArkTS';
+import { I18n } from '../model/I18n';
 
 const BEARER = 'Bearer AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs%3D1Zv7ttfk8LF81IUq16cHjhLTvJu4FA33AGWWjCpTnA';
 const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36';
@@ -56,9 +57,9 @@ export function errorText(value: Object): string {
   if (value instanceof Error) return (value as Error).message;
   try {
     const text = JSON.stringify(value);
-    return text.length > 0 ? text : '未知错误';
+    return text.length > 0 ? text : I18n.t('未知错误');
   } catch (e) {
-    return '未知错误';
+    return I18n.t('未知错误');
   }
 }
 
@@ -92,6 +93,10 @@ function asText(value: Object | undefined | null): string {
 
 function asNumber(value: Object | undefined | null): number {
   if (typeof value == 'number') return value as number;
+  if (typeof value == 'string') {
+    const parsed = Number.parseInt(value as string, 10);
+    if (!isNaN(parsed)) return parsed;
+  }
   return 0;
 }
 
@@ -105,11 +110,35 @@ function parseUser(result: Record<string, Object> | null): TweetItem {
   const avatar = asObj(userResult == null ? null : userResult['avatar']);
   item.authorName = asString(legacy == null ? null : legacy['name']);
   item.authorHandle = asString(legacy == null ? null : legacy['screen_name']);
+  item.authorId = asString(userResult == null ? null : userResult['rest_id']);
+  const relation = asObj(userResult == null ? null : userResult['relationship']);
+  item.authorFollowing = (relation != null && relation['following'] == true) ||
+    (legacy != null && legacy['following'] == true);
   item.avatarUrl = asString(legacy == null ? null : legacy['profile_image_url_https']);
   if (item.authorName.length == 0) item.authorName = asString(userCore == null ? null : userCore['name']);
   if (item.authorHandle.length == 0) item.authorHandle = asString(userCore == null ? null : userCore['screen_name']);
   if (item.avatarUrl.length == 0) item.avatarUrl = asString(avatar == null ? null : avatar['image_url']);
   return item;
+}
+
+function displayReplyText(legacy: Record<string, Object>, fullText: string, isReply: boolean): string {
+  if (!isReply || fullText.length == 0) return fullText;
+  const range = asArr(legacy['display_text_range']);
+  if (range.length >= 2) {
+    const start = asNumber(range[0]);
+    if (start > 0 && start < fullText.length) return fullText.substring(start);
+    return fullText;
+  }
+  // Older/REST responses may not carry display_text_range. Only strip the
+  // auto-inserted reply target mention, not mentions the user typed later.
+  const replyTo = asString(legacy['in_reply_to_screen_name']);
+  if (replyTo.length > 0) {
+    const prefix = `@${replyTo}`;
+    if (fullText.toLowerCase().startsWith(prefix.toLowerCase())) {
+      return fullText.substring(prefix.length).trimStart();
+    }
+  }
+  return fullText;
 }
 
 function isPromotedEntry(entry: Record<string, Object>): boolean {
@@ -137,16 +166,42 @@ function parseTweet(entry: Record<string, Object>, depth: number = 0): TweetItem
   const legacy = asObj(result['legacy']);
   if (legacy == null) return null;
 
+  const outerUser = parseUser(result);
+  if (depth < 1) {
+    const retweeted = asObj(legacy['retweeted_status_result']);
+    const retweetedResult = asObj(retweeted == null ? null : retweeted['result']);
+    if (retweetedResult != null) {
+      const syntheticTweetResults: Record<string, Object> = { 'result': retweetedResult };
+      const syntheticItemContent: Record<string, Object> = { 'tweet_results': syntheticTweetResults };
+      const syntheticContent: Record<string, Object> = { 'itemContent': syntheticItemContent };
+      const original = parseTweet({ 'content': syntheticContent }, depth + 1);
+      if (original != null) {
+        original.isRetweet = true;
+        original.retweetedByName = outerUser.authorName;
+        original.retweetedByHandle = outerUser.authorHandle;
+        return original;
+      }
+    }
+  }
+
   const item = parseUser(result);
   item.id = asString(result['rest_id']);
-  item.text = asString(legacy['full_text']);
   item.lang = asString(legacy['lang']);
   item.isReply = asString(legacy['in_reply_to_status_id_str']).length > 0;
+  item.text = displayReplyText(legacy, asString(legacy['full_text']), item.isReply);
   item.isRetweet = legacy['retweeted_status_result'] != undefined || asString(legacy['retweeted_status_id_str']).length > 0;
   item.createdAt = asString(legacy['created_at']);
   item.replyCount = asNumber(legacy['reply_count']);
   item.retweetCount = asNumber(legacy['retweet_count']);
   item.likeCount = asNumber(legacy['favorite_count']);
+  const views = asObj(result['views']);
+  item.viewCount = asNumber(views == null ? null : views['count']);
+  if (item.viewCount == 0) {
+    const extViews = asObj(result['ext_views']);
+    item.viewCount = asNumber(extViews == null ? null : extViews['count']);
+    if (item.viewCount == 0) item.viewCount = asNumber(extViews == null ? null : extViews['view_count']);
+  }
+  if (item.viewCount == 0) item.viewCount = asNumber(legacy['views_count']);
 
   const extended = asObj(legacy['extended_entities']);
   const media = asArr(extended == null ? null : extended['media']);
@@ -207,15 +262,20 @@ function parseRestTweet(raw: Object): TweetItem | null {
   if (tweet == null) return null;
   const item = new TweetItem();
   item.id = asString(tweet['id_str']);
-  item.text = asString(tweet['full_text']);
+  item.isReply = asString(tweet['in_reply_to_status_id_str']).length > 0;
+  item.isRetweet = tweet['retweeted_status'] != undefined || asString(tweet['retweeted_status_id_str']).length > 0;
+  item.text = displayReplyText(tweet, asString(tweet['full_text']), item.isReply);
   item.createdAt = asString(tweet['created_at']);
   item.replyCount = asNumber(tweet['reply_count']);
   item.retweetCount = asNumber(tweet['retweet_count']);
   item.likeCount = asNumber(tweet['favorite_count']);
+  item.viewCount = asNumber(tweet['views_count']);
   const user = asObj(tweet['user']);
   if (user != null) {
     item.authorName = asString(user['name']);
     item.authorHandle = asString(user['screen_name']);
+    item.authorId = asString(user['id_str']);
+    item.authorFollowing = user['following'] == true;
     item.avatarUrl = asString(user['profile_image_url_https']);
   }
   const extended = asObj(tweet['extended_entities']);
@@ -264,7 +324,7 @@ export class XApi {
       try {
         return await XApi.homeLatestGraphql(cookie, cursor);
       } catch (graphqlError) {
-        throw new Error(`时间线加载失败：REST ${errorText(restError)}；GraphQL ${errorText(graphqlError)}`);
+        throw new Error(I18n.t(`时间线加载失败：REST ${errorText(restError)}；GraphQL ${errorText(graphqlError)}`));
       }
     }
   }
@@ -294,7 +354,7 @@ export class XApi {
       request.destroy();
     }
 
-    if (text.trim().length == 0) throw new Error('REST 返回空响应');
+    if (text.trim().length == 0) throw new Error(I18n.t('REST 返回空响应'));
     const parsed = JSON.parse(text) as Object;
     const result = new HomeResult();
     for (const raw of asArr(parsed)) {
@@ -471,7 +531,7 @@ export class XApi {
       if (errors.length > 0) {
         const first = asObj(errors[0]);
         const message = asString(first == null ? null : first['message']);
-        throw new Error(message.length > 0 ? message : 'X 返回错误');
+        throw new Error(message.length > 0 ? message : I18n.t('X 返回错误'));
       }
       return text;
     } finally {
@@ -479,10 +539,10 @@ export class XApi {
     }
   }
 
-  static async search(cookie: string, query: string, cursor: string = '', product: string = 'Top'): Promise<HomeResult> {
+  static async search(cookie: string, query: string, cursor: string = '', product: string = 'Top', count: number = 20): Promise<HomeResult> {
     const variables: Record<string, Object> = {
       'rawQuery': query,
-      'count': 20,
+      'count': count,
       'querySource': 'typed_query',
       'product': product,
       'withGrokTranslatedBio': true,
@@ -496,7 +556,7 @@ export class XApi {
     candidates.push('GcXk9vN_d1jUfHNqLacXQA');
     candidates.push('M1jEez78PEfVfbQLvlWMvQ');
     let firstPage: HomeResult | null = null;
-    let lastError: Error = new Error('搜索失败');
+    let lastError: Error = new Error(I18n.t('搜索失败'));
     for (const qid of candidates) {
       if (qid.length == 0 || candidates.indexOf(qid) != candidates.lastIndexOf(qid)) continue;
       try {
@@ -632,7 +692,7 @@ export class XApi {
       });
       const text = response.result as string;
       if (response.responseCode < 200 || response.responseCode >= 300) {
-        throw new Error(`媒体上传 HTTP ${response.responseCode}: ${text.substring(0, 120)}`);
+        throw new Error(I18n.t(`媒体上传 HTTP ${response.responseCode}: ${text.substring(0, 120)}`));
       }
       return text;
     } finally {
@@ -675,7 +735,7 @@ export class XApi {
     console.info(`XHMedia INIT response ${initText.substring(0, 160)}`);
     const initRoot = asObj(JSON.parse(initText) as Object);
     const mediaId = asString(initRoot == null ? null : initRoot['media_id_string']);
-    if (mediaId.length == 0) throw new Error('媒体 INIT 未返回 media_id');
+    if (mediaId.length == 0) throw new Error(I18n.t('媒体 INIT 未返回 media_id'));
 
     const chunkSize = 1024 * 1024;
     const encoder = new util.TextEncoder();
@@ -718,7 +778,7 @@ export class XApi {
         state = asString(p == null ? null : p['state']);
         checks++;
       }
-      if (state == 'failed') throw new Error('视频转码失败');
+      if (state == 'failed') throw new Error(I18n.t('视频转码失败'));
     }
     try {
       const metaHeaders = XApi.headers(cookie);
@@ -770,7 +830,7 @@ export class XApi {
       const text = response.result as string;
       console.info(`XHProfileImage status=${response.responseCode} body=${text.substring(0, 120)}`);
       if (response.responseCode < 200 || response.responseCode >= 300) {
-        throw new Error(`头像上传 HTTP ${response.responseCode}`);
+        throw new Error(I18n.t(`头像上传 HTTP ${response.responseCode}`));
       }
       const root = asObj(JSON.parse(text) as Object);
       const errors = asArr(root == null ? null : root['errors']);
@@ -856,7 +916,7 @@ export class XApi {
       const results = asObj(create == null ? null : create['tweet_results']);
       const result = asObj(results == null ? null : results['result']);
       const id = asString(result == null ? null : result['rest_id']);
-      if (id.length == 0) throw new Error('X 未返回新推文 ID');
+      if (id.length == 0) throw new Error(I18n.t('X 未返回新推文 ID'));
     } catch (e) {
       if (mediaIds.length > 0) throw e as Error;
       await XApi.createTweetRest(cookie, text, replyToId, quoteUrl);
@@ -903,7 +963,7 @@ export class XApi {
     const viewer = asObj(data == null ? null : data['viewer']);
     const userResults = asObj(viewer == null ? null : viewer['user_results']);
     const result = asObj(userResults == null ? null : userResults['result']);
-    if (result == null) throw new Error('Viewer 未返回用户资料');
+    if (result == null) throw new Error(I18n.t('Viewer 未返回用户资料'));
     const legacy = asObj(result['legacy']);
     const core = asObj(result['core']);
     const avatar = asObj(result['avatar']);
@@ -920,6 +980,9 @@ export class XApi {
     profile.followers = asNumber(legacy == null ? null : legacy['followers_count']);
     profile.following = asNumber(legacy == null ? null : legacy['friends_count']);
     profile.verified = result['is_blue_verified'] == true || (legacy != null && legacy['verified'] == true);
+    const viewerRelation = asObj(result['relationship']);
+    profile.isFollowing = (viewerRelation != null && viewerRelation['following'] == true) ||
+      (legacy != null && legacy['following'] == true);
     profile.createdAt = asString(core == null ? null : core['created_at']);
     if (profile.createdAt.length == 0) profile.createdAt = asString(legacy == null ? null : legacy['created_at']);
     profile.location = asString(legacy == null ? null : legacy['location']);
@@ -931,7 +994,7 @@ export class XApi {
       profile.website = asString(firstUrl == null ? null : firstUrl['expanded_url']);
     }
     profile.birthDate = asString(legacy == null ? null : legacy['birthdate']);
-    if (profile.id.length == 0) throw new Error('Viewer 未返回用户 ID');
+    if (profile.id.length == 0) throw new Error(I18n.t('Viewer 未返回用户 ID'));
     return profile;
   }
 
@@ -1051,7 +1114,7 @@ export class XApi {
       }
     }
     if (result.tweets.length == 0) {
-      throw new Error('推文详情为空');
+      throw new Error(I18n.t('推文详情为空'));
     }
     return result;
   }
@@ -1102,7 +1165,7 @@ export class XApi {
     } finally {
       request.destroy();
     }
-    if (result.tweets.length == 0) throw new Error('推文详情为空（REST）');
+    if (result.tweets.length == 0) throw new Error(I18n.t('推文详情为空（REST）'));
     return result;
   }
 
@@ -1235,7 +1298,7 @@ export class XApi {
     const user = asObj(data == null ? null : data['user']);
     const result = asObj(user == null ? null : user['result']);
     const legacy = asObj(result == null ? null : result['legacy']);
-    if (legacy == null) throw new Error('用户资料为空');
+    if (legacy == null) throw new Error(I18n.t('用户资料为空'));
     const profile = new UserProfile();
     profile.id = asString(result == null ? null : result['rest_id']);
     profile.name = asString(legacy['name']);
@@ -1301,7 +1364,7 @@ export class XApi {
         if (item.id.length > 0) result.push(item);
       }
     }
-    if (result.length == 0) throw new Error('通知为空（REST）');
+    if (result.length == 0) throw new Error(I18n.t('通知为空（REST）'));
     return page;
   }
 
@@ -1321,9 +1384,15 @@ export class XApi {
     p.avatarUrl = asString(avatar == null ? null : avatar['image_url']);
     if (p.avatarUrl.length == 0) p.avatarUrl = asString(legacy == null ? null : legacy['profile_image_url_https']);
     p.bannerUrl = asString(legacy == null ? null : legacy['profile_banner_url']);
-    p.followers = asNumber(legacy == null ? null : legacy['followers_count']);
-    p.following = asNumber(legacy == null ? null : legacy['friends_count']);
+    const relationship = asObj(result['relationship_counts']);
+    p.followers = asNumber(relationship == null ? null : relationship['followers']);
+    if (p.followers == 0) p.followers = asNumber(legacy == null ? null : legacy['followers_count']);
+    p.following = asNumber(relationship == null ? null : relationship['following']);
+    if (p.following == 0) p.following = asNumber(legacy == null ? null : legacy['friends_count']);
     p.verified = result['is_blue_verified'] == true || (legacy != null && legacy['verified'] == true);
+    const relationState = asObj(result['relationship']);
+    p.isFollowing = (relationState != null && relationState['following'] == true) ||
+      (legacy != null && legacy['following'] == true);
     p.createdAt = asString(core == null ? null : core['created_at']);
     if (p.createdAt.length == 0) p.createdAt = asString(legacy == null ? null : legacy['created_at']);
     return p;
@@ -1386,7 +1455,7 @@ export class XApi {
         if (text.length > 0) break;
       } catch (e) {}
     }
-    if (text.length == 0) throw new Error('关注列表加载失败');
+    if (text.length == 0) throw new Error(I18n.t('关注列表加载失败'));
     const root = asObj(JSON.parse(text) as Object);
     const data = asObj(root == null ? null : root['data']);
     const user = asObj(data == null ? null : data['user']);
@@ -1417,18 +1486,64 @@ export class XApi {
     return result;
   }
 
+  static async userTweetsTab(cookie: string, userId: string, handle: string,
+    tab: number, cursor: string): Promise<HomeResult> {
+    if (tab == 1) {
+      return await XApi.userRepliesSearch(cookie, handle, cursor);
+    }
+    return await XApi.userTimeline(cookie, userId, cursor, 'UserTweets');
+  }
+
+  private static async userRepliesSearch(cookie: string, handle: string,
+    cursor: string): Promise<HomeResult> {
+    let queryId = '';
+    try {
+      queryId = await QueryIds.resolve(cookie, 'SearchTimeline');
+    } catch (e) {}
+    if (queryId.length == 0) queryId = 'hz_94eVAtrtQo_vO3my7Rw';
+    const variables: Record<string, Object> = {
+      'rawQuery': `from:${handle} filter:replies`,
+      'count': 10,
+      'querySource': 'typed_query',
+      'product': 'Latest',
+      'withGrokTranslatedBio': true,
+      'withQuickPromoteEligibilityTweetFields': false
+    };
+    if (cursor.length > 0) variables['cursor'] = cursor;
+    const fieldToggles: Record<string, Object> = { 'withArticleRichContentState': false };
+    const text = await XApi.graphqlPost(cookie, queryId, 'SearchTimeline', variables, fieldToggles);
+    const root = asObj(JSON.parse(text) as Object);
+    if (root != null && asArr(root['errors']).length > 0) {
+      throw new Error('搜索接口返回错误');
+    }
+    const data = asObj(root == null ? null : root['data']);
+    const search = asObj(data == null ? null : data['search_by_raw_query']);
+    const searchTimeline = asObj(search == null ? null : search['search_timeline']);
+    const timeline = asObj(searchTimeline == null ? null : searchTimeline['timeline']);
+    return XApi.parseTimeline(timeline);
+  }
+
   static async userTweets(cookie: string, userId: string, cursor: string): Promise<HomeResult> {
-    const queryId = await QueryIds.resolve(cookie, 'UserTweets');
+    return XApi.userTimeline(cookie, userId, cursor, 'UserTweets');
+  }
+
+  static async userTweetsAndReplies(cookie: string, userId: string, cursor: string): Promise<HomeResult> {
+    return XApi.userTimeline(cookie, userId, cursor, 'UserTweetsAndReplies');
+  }
+
+  private static async userTimeline(cookie: string, userId: string, cursor: string, operation: string): Promise<HomeResult> {
+    const queryId = await QueryIds.resolve(cookie, operation);
     const variables: Record<string, Object> = {
       'userId': userId,
-      'count': 20,
+      'count': 10,
       'includePromotedContent': false,
       'withVoice': true
     };
     if (cursor.length > 0) variables['cursor'] = cursor;
-    const url = `https://x.com/i/api/graphql/${queryId}/UserTweets` +
+    const url = `https://x.com/i/api/graphql/${queryId}/${operation}` +
       `?variables=${encodeURIComponent(JSON.stringify(variables))}` +
-      `&features=${encodeURIComponent(JSON.stringify(READ_FEATURES))}`;
+      `&features=${encodeURIComponent(JSON.stringify(READ_FEATURES))}` +
+      `&fieldToggles=${encodeURIComponent(JSON.stringify({ 'withArticlePlainText': false }))}`;
     const request = http.createHttp();
     let text = '';
     try {
@@ -1451,7 +1566,11 @@ export class XApi {
     const user = asObj(data == null ? null : data['user']);
     const resultObj = asObj(user == null ? null : user['result']);
     const timelineV2 = asObj(resultObj == null ? null : resultObj['timeline_v2']);
-    const timeline = asObj(timelineV2 == null ? null : timelineV2['timeline']);
+    let timeline = asObj(timelineV2 == null ? null : timelineV2['timeline']);
+    if (timeline == null) {
+      const timelineRoot = asObj(resultObj == null ? null : resultObj['timeline']);
+      timeline = asObj(timelineRoot == null ? null : timelineRoot['timeline']);
+    }
     const instructions = asArr(timeline == null ? null : timeline['instructions']);
     const result = new HomeResult();
     for (const rawInstruction of instructions) {
@@ -1507,23 +1626,97 @@ export class XApi {
     const user = asObj(data == null ? null : data['user']);
     const result = asObj(user == null ? null : user['result']);
     const legacy = asObj(result == null ? null : result['legacy']);
-    if (legacy == null) throw new Error('用户不存在');
+    const core = asObj(result == null ? null : result['core']);
+    const avatar = asObj(result == null ? null : result['avatar']);
+    const profileBio = asObj(result == null ? null : result['profile_bio']);
+    if (legacy == null && core == null) throw new Error(I18n.t('用户不存在'));
     const profile = new UserProfile();
     profile.id = asString(result == null ? null : result['rest_id']);
-    profile.name = asString(legacy['name']);
-    profile.handle = asString(legacy['screen_name']);
-    profile.description = asString(legacy['description']);
-    profile.avatarUrl = asString(legacy['profile_image_url_https']);
-    profile.bannerUrl = asString(legacy['profile_banner_url']);
-    profile.followers = asNumber(legacy['followers_count']);
-    profile.following = asNumber(legacy['friends_count']);
-    const core = asObj(result == null ? null : result['core']);
-    profile.verified = (result != null && result['is_blue_verified'] == true) || legacy['verified'] == true;
+    profile.name = asString(legacy == null ? null : legacy['name']);
+    if (profile.name.length == 0) profile.name = asString(core == null ? null : core['name']);
+    profile.handle = asString(legacy == null ? null : legacy['screen_name']);
+    if (profile.handle.length == 0) profile.handle = asString(core == null ? null : core['screen_name']);
+    profile.description = asString(legacy == null ? null : legacy['description']);
+    if (profile.description.length == 0) profile.description = asString(profileBio == null ? null : profileBio['description']);
+    profile.avatarUrl = asString(legacy == null ? null : legacy['profile_image_url_https']);
+    if (profile.avatarUrl.length == 0) profile.avatarUrl = asString(avatar == null ? null : avatar['image_url']);
+    profile.bannerUrl = asString(legacy == null ? null : legacy['profile_banner_url']);
+    const relationship = asObj(result == null ? null : result['relationship_counts']);
+    profile.followers = asNumber(relationship == null ? null : relationship['followers']);
+    if (profile.followers == 0) profile.followers = asNumber(legacy == null ? null : legacy['followers_count']);
+    profile.following = asNumber(relationship == null ? null : relationship['following']);
+    if (profile.following == 0) profile.following = asNumber(legacy == null ? null : legacy['friends_count']);
+    profile.verified = (result != null && result['is_blue_verified'] == true) ||
+      (legacy != null && legacy['verified'] == true);
+    const relationUser = asObj(result == null ? null : result['relationship']);
+    profile.isFollowing = (relationUser != null && relationUser['following'] == true) ||
+      (legacy != null && legacy['following'] == true);
     profile.createdAt = asString(core == null ? null : core['created_at']);
-    if (profile.createdAt.length == 0) profile.createdAt = asString(legacy['created_at']);
+    if (profile.createdAt.length == 0) profile.createdAt = asString(legacy == null ? null : legacy['created_at']);
     return profile;
   }
 
+
+  static async followStates(cookie: string, handles: string[]): Promise<Record<string, boolean>> {
+    const result: Record<string, boolean> = {};
+    const unique: string[] = [];
+    for (const handle of handles) {
+      if (handle.length > 0 && unique.indexOf(handle) < 0 && unique.length < 100) unique.push(handle);
+    }
+    if (unique.length == 0) return result;
+    const url = `https://x.com/i/api/1.1/friendships/lookup.json?screen_name=${encodeURIComponent(unique.join(','))}`;
+    const request = http.createHttp();
+    try {
+      const response = await request.request(url, {
+        method: http.RequestMethod.GET,
+        header: XApi.headers(cookie),
+        expectDataType: http.HttpDataType.STRING,
+        connectTimeout: 15000,
+        readTimeout: 20000
+      });
+      if (response.responseCode < 200 || response.responseCode >= 300) return result;
+      const list = JSON.parse(response.result as string) as Object[];
+      if (!Array.isArray(list)) return result;
+      for (const raw of list) {
+        const user = asObj(raw);
+        const handle = asString(user == null ? null : user['screen_name']);
+        const connections = asArr(user == null ? null : user['connections']);
+        result[handle] = connections.indexOf('following') >= 0;
+      }
+    } catch (e) {
+    } finally {
+      request.destroy();
+    }
+    return result;
+  }
+
+  static async setFollow(cookie: string, userId: string, handle: string,
+    follow: boolean): Promise<boolean> {
+    const action = follow ? 'create' : 'destroy';
+    let body = '';
+    if (userId.length > 0) body = `user_id=${encodeURIComponent(userId)}`;
+    else body = `screen_name=${encodeURIComponent(handle)}`;
+    body += '&skip_status=1&include_user_entities=false';
+    const headers = XApi.headers(cookie);
+    headers['content-type'] = 'application/x-www-form-urlencoded';
+    const request = http.createHttp();
+    try {
+      const response = await request.request(`https://x.com/i/api/1.1/friendships/${action}.json`, {
+        method: http.RequestMethod.POST,
+        header: headers,
+        extraData: body,
+        expectDataType: http.HttpDataType.STRING,
+        connectTimeout: 20000,
+        readTimeout: 20000
+      });
+      if (response.responseCode < 200 || response.responseCode >= 300) {
+        throw new Error(`HTTP ${response.responseCode}`);
+      }
+      return true;
+    } finally {
+      request.destroy();
+    }
+  }
 
   static async trends(cookie: string, woeid: number = 1): Promise<TrendItem[]> {
     const request = http.createHttp();
@@ -1563,10 +1756,10 @@ export class XApi {
 
 
 
-  static async searchUsers(cookie: string, query: string, cursor: string = ''): Promise<UserSearchResult> {
+  static async searchUsers(cookie: string, query: string, cursor: string = '', count: number = 20): Promise<UserSearchResult> {
     const variables: Record<string, Object> = {
       'rawQuery': query,
-      'count': 20,
+      'count': count,
       'querySource': 'typed_query',
       'product': 'People',
       'withGrokTranslatedBio': true
@@ -1578,7 +1771,7 @@ export class XApi {
     candidates.push('hz_94eVAtrtQo_vO3my7Rw');
     candidates.push('GcXk9vN_d1jUfHNqLacXQA');
     let firstPage: UserSearchResult | null = null;
-    let lastError: Error = new Error('用户搜索失败');
+    let lastError: Error = new Error(I18n.t('用户搜索失败'));
     for (const qid of candidates) {
       if (qid.length == 0 || candidates.indexOf(qid) != candidates.lastIndexOf(qid)) continue;
       try {
@@ -1678,7 +1871,7 @@ export class XApi {
     const result = asObj(tweetResult == null ? null : tweetResult['result']);
     const translated = asObj(result == null ? null : result['translated']);
     const translation = asString(translated == null ? null : translated['translation']);
-    if (translation.length == 0) throw new Error('没有可用翻译');
+    if (translation.length == 0) throw new Error(I18n.t('没有可用翻译'));
     if (XApi.translationCache.size >= 80) {
       const keys: string[] = [];
       XApi.translationCache.forEach((value: string, k: string) => { keys.push(k); });

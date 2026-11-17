@@ -2,13 +2,24 @@ import { TweetItem } from '../model/TweetItem';
 import { UserProfile } from '../model/UserProfile';
 import { XApi } from '../api/XApi';
 import { TweetCard } from './TweetCard';
+import { VideoAutoplay } from '../model/VideoAutoplay';
+import { I18n } from '../model/I18n';
+import { SearchSnapshotStore, SearchPageSnapshot } from '../model/SearchSnapshotStore';
 
 @Component
 export struct SearchResultPage {
+  @StorageProp('clientLang') clientLanguage: string = 'zh';
+  private tr(value: string): string {
+    return this.clientLanguage.length >= 0 ? I18n.t(value) : I18n.t(value);
+  }
+
   tab: number = 0;
-  @Prop @Watch('onQueryChanged') query: string = '';
+  @Prop query: string = '';
   @Prop @Watch('onSearchTickChanged') searchTick: number = 0;
   @Prop @Watch('onActiveChanged') active: boolean = false;
+  @Prop @Watch('onPageActiveChanged') pageActive: boolean = false;
+  @Prop @Watch('onActivationTickChanged') activationTick: number = 0;
+  @Prop @Watch('onScrollTopRequested') scrollTopTick: number = 0;
   cookie: string = '';
   bottomInset: number = 76;
   onReply: (item: TweetItem) => void = () => {};
@@ -25,40 +36,123 @@ export struct SearchResultPage {
   @State error: string = '';
   @State cursor: string = '';
   private loadedQuery: string = '';
-  private currentQuery: string = '';
-  private scroller: Scroller = new Scroller();
+  private fetchedAt: number = 0;
+  private scrollOffset: number = 0;
   private firstIndex: number = 0;
+  private restoring: boolean = false;
+  private scroller: Scroller = new Scroller();
 
   aboutToAppear(): void {
-    if (this.active && this.query.trim().length > 0) this.load();
+    if (this.query.trim().length > 0 && (this.active || this.pageActive)) this.beginQuery();
   }
 
-  onQueryChanged(): void {
-    this.loadedQuery = '';
-    this.clear();
-    if (this.active && this.query.trim().length > 0) this.load();
+  aboutToDisappear(): void {
+    this.saveSnapshot();
   }
 
   onSearchTickChanged(): void {
-    this.loadedQuery = '';
-    this.clear();
-    if (this.active && this.query.trim().length > 0) this.load();
+    // All three result pages are mounted, so the initial search starts their
+    // first-page requests together.
+    this.beginQuery();
   }
 
   onActiveChanged(): void {
-    if (this.active && this.query.trim().length > 0 && this.loadedQuery != this.query) {
-      this.load();
+    if (this.active) this.checkTtl();
+    else this.saveSnapshot();
+  }
+
+  onPageActiveChanged(): void {
+    if (this.pageActive && this.active) this.checkTtl();
+    else this.saveSnapshot();
+  }
+
+  onActivationTickChanged(): void {
+    if (this.pageActive && this.active) this.checkTtl();
+  }
+
+  onScrollTopRequested(): void {
+    if (!this.active) return;
+    this.restoring = true;
+    this.scrollOffset = 0;
+    try { this.scroller.scrollToIndex(0, true, ScrollAlign.START); } catch (e) {}
+    setTimeout(() => { this.restoring = false; }, 350);
+  }
+
+  private hasData(): boolean {
+    return this.tweets.length > 0 || this.users.length > 0;
+  }
+
+  private saveSnapshot(): void {
+    if (this.loadedQuery.trim().length == 0 || this.fetchedAt <= 0) return;
+    SearchSnapshotStore.put(this.loadedQuery, this.tab, this.tweets, this.users,
+      this.cursor, this.fetchedAt, this.scrollOffset);
+  }
+
+  private applySnapshot(snapshot: SearchPageSnapshot, query: string): void {
+    this.loadedQuery = query;
+    this.tweets = snapshot.tweets;
+    this.users = snapshot.users;
+    this.cursor = snapshot.cursor;
+    this.fetchedAt = snapshot.fetchedAt;
+    this.scrollOffset = snapshot.scrollOffset;
+    if (this.scrollOffset > 0) {
+      this.restoring = true;
+      setTimeout(() => {
+        try { this.scroller.scrollTo({ xOffset: 0, yOffset: this.scrollOffset, animation: false }); } catch (e) {}
+        this.restoring = false;
+      }, 100);
     }
   }
 
-  private clear(): void {
+  private beginQuery(): void {
+    const q = this.query.trim();
+    if (q.length == 0) {
+      this.saveSnapshot();
+      this.loadedQuery = '';
+      this.tweets = [];
+      this.users = [];
+      this.cursor = '';
+      this.fetchedAt = 0;
+      this.error = '';
+      return;
+    }
+    if (q == this.loadedQuery) {
+      this.checkTtl();
+      return;
+    }
+    this.saveSnapshot();
+    const snapshot = SearchSnapshotStore.get(q, this.tab);
+    if (snapshot != null) {
+      this.applySnapshot(snapshot, q);
+      if (SearchSnapshotStore.isStale(snapshot, this.tab)) this.refreshPage();
+      return;
+    }
     this.tweets = [];
     this.users = [];
     this.cursor = '';
+    this.fetchedAt = 0;
     this.error = '';
+    this.scrollOffset = 0;
+    this.load(false);
   }
 
-  private async load(): Promise<void> {
+  private checkTtl(): void {
+    const q = this.query.trim();
+    if (q.length == 0) return;
+    if (q != this.loadedQuery) {
+      this.beginQuery();
+      return;
+    }
+    if (!this.hasData()) {
+      if (!this.loading) this.load(false);
+      return;
+    }
+    if (Date.now() - this.fetchedAt >= SearchSnapshotStore.ttlMs(this.tab)) {
+      this.refreshPage();
+    }
+  }
+
+  private async load(more: boolean): Promise<void> {
     if (this.loading) return;
     const q = this.query.trim();
     if (q.length == 0) return;
@@ -66,17 +160,23 @@ export struct SearchResultPage {
     this.error = '';
     try {
       if (this.tab == 2) {
-        const page = await XApi.searchUsers(this.cookie, q, '');
-        this.users = page.users;
+        const page = await XApi.searchUsers(this.cookie, q, more ? this.cursor : '', 10);
+        this.users = more ? this.users.concat(page.users) : page.users;
         this.cursor = page.cursor;
       } else {
         const product = this.tab == 1 ? 'Latest' : 'Top';
-        const page = await XApi.search(this.cookie, q, '', product);
-        this.tweets = page.tweets;
+        const page = await XApi.search(this.cookie, q, more ? this.cursor : '', product, 10);
+        this.tweets = more ? this.tweets.concat(page.tweets) : page.tweets;
         this.cursor = page.cursor;
       }
       this.loadedQuery = q;
-      this.scroller.scrollToIndex(0, false);
+      this.fetchedAt = Date.now();
+      if (!more) {
+        this.scrollOffset = 0;
+        this.firstIndex = 0;
+        try { this.scroller.scrollToIndex(0, false); } catch (e) {}
+      }
+      this.saveSnapshot();
     } catch (e) {
       this.error = `${e}`;
     } finally {
@@ -85,33 +185,44 @@ export struct SearchResultPage {
   }
 
   private async refreshPage(): Promise<void> {
-    this.refreshing = true;
+    if (this.loading || this.refreshing) return;
     const q = this.query.trim();
+    if (q.length == 0) return;
+    this.refreshing = true;
     try {
       if (this.tab == 2) {
-        const page = await XApi.searchUsers(this.cookie, q, '');
+        const page = await XApi.searchUsers(this.cookie, q, '', 10);
         const existing: string[] = this.users.map((u: UserProfile) => u.handle);
-        const added = page.users.filter((u: UserProfile) => existing.indexOf(u.handle) < 0);
-        if (added.length > 0) {
+        const fresh = page.users.filter((u: UserProfile) => existing.indexOf(u.handle) < 0);
+        if (fresh.length > 0) {
           const anchor = this.firstIndex;
-          this.users = added.concat(this.users);
+          this.restoring = true;
+          this.users = fresh.concat(this.users);
           setTimeout(() => {
-            this.scroller.scrollToIndex(anchor + added.length, false, ScrollAlign.START);
+            try { this.scroller.scrollToIndex(anchor + fresh.length, false, ScrollAlign.START); } catch (e) {}
+            this.restoring = false;
           }, 0);
         }
+        if (this.cursor.length == 0) this.cursor = page.cursor;
       } else {
         const product = this.tab == 1 ? 'Latest' : 'Top';
-        const page = await XApi.search(this.cookie, q, '', product);
+        const page = await XApi.search(this.cookie, q, '', product, 10);
         const existing: string[] = this.tweets.map((t: TweetItem) => t.id);
-        const added = page.tweets.filter((t: TweetItem) => existing.indexOf(t.id) < 0);
-        if (added.length > 0) {
+        const fresh = page.tweets.filter((t: TweetItem) => existing.indexOf(t.id) < 0);
+        if (fresh.length > 0) {
           const anchor = this.firstIndex;
-          this.tweets = added.concat(this.tweets);
+          this.restoring = true;
+          this.tweets = fresh.concat(this.tweets);
           setTimeout(() => {
-            this.scroller.scrollToIndex(anchor + added.length, false, ScrollAlign.START);
+            try { this.scroller.scrollToIndex(anchor + fresh.length, false, ScrollAlign.START); } catch (e) {}
+            this.restoring = false;
           }, 0);
         }
+        if (this.cursor.length == 0) this.cursor = page.cursor;
       }
+      this.loadedQuery = q;
+      this.fetchedAt = Date.now();
+      this.saveSnapshot();
     } catch (e) {
       this.error = `${e}`;
     } finally {
@@ -120,20 +231,8 @@ export struct SearchResultPage {
   }
 
   private async loadMore(): Promise<void> {
-    if (this.loading || this.cursor.length == 0) return;
-    const q = this.query.trim();
-    try {
-      if (this.tab == 2) {
-        const page = await XApi.searchUsers(this.cookie, q, this.cursor);
-        this.users = this.users.concat(page.users);
-        this.cursor = page.cursor;
-      } else {
-        const product = this.tab == 1 ? 'Latest' : 'Top';
-        const page = await XApi.search(this.cookie, q, this.cursor, product);
-        if (page.tweets.length > 0) this.tweets = this.tweets.concat(page.tweets);
-        this.cursor = page.cursor;
-      }
-    } catch (e) {}
+    if (this.loading || this.refreshing || this.cursor.length == 0) return;
+    await this.load(true);
   }
 
   @Builder
@@ -160,16 +259,25 @@ export struct SearchResultPage {
     }.width('100%')
   }
 
+  @Builder
+  emptySearch() {
+    Column() {
+      Text(this.tr('输入关键词开始搜索')).fontSize(14).fontColor($r('app.color.text_secondary'))
+    }.width('100%').height('100%').justifyContent(FlexAlign.Center)
+  }
+
   build() {
     Column() {
-      if (this.loading && this.tweets.length == 0 && this.users.length == 0) {
+      if (this.query.trim().length == 0) {
+        this.emptySearch()
+      } else if (this.loading && this.tweets.length == 0 && this.users.length == 0) {
         Column() { LoadingProgress().width(32).height(32) }
           .layoutWeight(1).width('100%').justifyContent(FlexAlign.Center)
       } else if (this.error.length > 0 && this.tweets.length == 0 && this.users.length == 0) {
         Column() {
           Text(this.error).fontSize(13).fontColor('#F4212E')
             .width('100%').textAlign(TextAlign.Center).padding(16)
-          Button('重试').onClick(() => this.load())
+          Button(this.tr('重试')).onClick(() => this.load(false))
         }.layoutWeight(1).width('100%').justifyContent(FlexAlign.Center)
       } else if (this.tab == 2) {
         Refresh({ refreshing: this.refreshing }) {
@@ -177,10 +285,24 @@ export struct SearchResultPage {
             ForEach(this.users, (item: UserProfile) => {
               ListItem() { this.userRow(item) }
             }, (item: UserProfile) => item.handle)
+            if (this.cursor.length > 0) {
+              ListItem() {
+                Row() {
+                  LoadingProgress().width(18).height(18)
+                  Text(this.tr('加载更多…')).fontSize(12)
+                    .fontColor($r('app.color.text_secondary')).margin({ left: 8 })
+                }.width('100%').height(44).justifyContent(FlexAlign.Center)
+              }.onAppear(() => this.loadMore())
+            }
           }
           .width('100%').height('100%')
           .contentEndOffset(this.bottomInset)
+          .onScrollStart(() => VideoAutoplay.onScrollStart())
+          .onScrollStop(() => VideoAutoplay.onScrollStop())
           .onScrollIndex((start: number) => { this.firstIndex = start; })
+          .onScroll((offset: number) => {
+            if (!this.restoring) this.scrollOffset = Math.max(0, this.scrollOffset + offset);
+          })
           .onReachEnd(() => this.loadMore())
         }
         .onRefreshing(() => { this.refreshPage(); })
@@ -188,7 +310,7 @@ export struct SearchResultPage {
       } else {
         Refresh({ refreshing: this.refreshing }) {
           List({ scroller: this.scroller }) {
-            ForEach(this.tweets, (item: TweetItem) => {
+            ForEach(this.tweets, (item: TweetItem, index: number) => {
               ListItem() {
                 Column() {
                   TweetCard({
@@ -200,7 +322,9 @@ export struct SearchResultPage {
                     onPlay: (value: TweetItem, startTime: number) => this.onPlay(value, startTime),
                     onImage: (url: string) => this.onImage(url),
                     onOpenQuoted: (id: string) => this.onOpenQuoted(id),
-                    onOpenUser: (handle: string) => this.onOpenUser(handle)
+                    onOpenUser: (handle: string) => this.onOpenUser(handle),
+                    videoPane: 'left',
+                    videoIndex: index
                   })
                   Divider().strokeWidth(1).color($r('app.color.divider'))
                 }
@@ -211,10 +335,24 @@ export struct SearchResultPage {
                 )
               }
             }, (item: TweetItem) => item.id)
+            if (this.cursor.length > 0) {
+              ListItem() {
+                Row() {
+                  LoadingProgress().width(18).height(18)
+                  Text(this.tr('加载更多…')).fontSize(12)
+                    .fontColor($r('app.color.text_secondary')).margin({ left: 8 })
+                }.width('100%').height(44).justifyContent(FlexAlign.Center)
+              }.onAppear(() => this.loadMore())
+            }
           }
           .width('100%').height('100%')
           .contentEndOffset(this.bottomInset)
+          .onScrollStart(() => VideoAutoplay.onScrollStart())
+          .onScrollStop(() => VideoAutoplay.onScrollStop())
           .onScrollIndex((start: number) => { this.firstIndex = start; })
+          .onScroll((offset: number) => {
+            if (!this.restoring) this.scrollOffset = Math.max(0, this.scrollOffset + offset);
+          })
           .onReachEnd(() => this.loadMore())
         }
         .onRefreshing(() => { this.refreshPage(); })

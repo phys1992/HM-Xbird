@@ -11,6 +11,9 @@ const KEY_THEME_MODE = 'theme_mode';
 const KEY_IMAGE_LIMIT = 'image_limit_mb';
 const KEY_GIF_LIMIT = 'gif_limit_mb';
 const KEY_MEDIA_QUALITY = 'media_quality';
+const KEY_IMAGE_QUALITY = 'image_quality';
+const KEY_GIF_QUALITY = 'gif_quality';
+const KEY_SHARE_CONSENT = 'share_consent';
 
 export class SessionStore {
   private static store: preferences.Preferences | null = null;
@@ -76,11 +79,24 @@ export class SessionStore {
     return typeof value == 'string' ? value as string : 'system';
   }
 
-  static saveMediaSettings(context: common.UIAbilityContext, imageLimit: number, gifLimit: number, quality: number): void {
+  static loadShareConsent(context: common.UIAbilityContext): boolean {
+    const value = SessionStore.getStore(context).getSync(KEY_SHARE_CONSENT, false);
+    return typeof value == 'boolean' ? value as boolean : false;
+  }
+
+  static saveShareConsent(context: common.UIAbilityContext): void {
+    const store = SessionStore.getStore(context);
+    store.putSync(KEY_SHARE_CONSENT, true);
+    store.flush();
+  }
+
+  static saveMediaSettings(context: common.UIAbilityContext, imageLimit: number, gifLimit: number,
+    imageQuality: number, gifQuality: number): void {
     const store = SessionStore.getStore(context);
     store.putSync(KEY_IMAGE_LIMIT, imageLimit);
     store.putSync(KEY_GIF_LIMIT, gifLimit);
-    store.putSync(KEY_MEDIA_QUALITY, quality);
+    store.putSync(KEY_IMAGE_QUALITY, imageQuality);
+    store.putSync(KEY_GIF_QUALITY, gifQuality);
     store.flush();
   }
 
@@ -94,9 +110,28 @@ export class SessionStore {
     return typeof value == 'number' ? value as number : 15;
   }
 
-  static loadMediaQuality(context: common.UIAbilityContext): number {
-    const value = SessionStore.getStore(context).getSync(KEY_MEDIA_QUALITY, 2);
-    return typeof value == 'number' ? value as number : 2;
+  static loadImageQuality(context: common.UIAbilityContext): number {
+    return SessionStore.loadQuality(context, KEY_IMAGE_QUALITY);
+  }
+
+  static loadGifQuality(context: common.UIAbilityContext): number {
+    return SessionStore.loadQuality(context, KEY_GIF_QUALITY);
+  }
+
+  private static loadQuality(context: common.UIAbilityContext, key: string): number {
+    const store = SessionStore.getStore(context);
+    const value = store.getSync(key, -1);
+    if (typeof value == 'number' && (value as number) >= 0 && (value as number) <= 1) {
+      const v = value as number;
+      if (Math.abs(v - 1) < 0.012) return 1;
+      if (Math.abs(v) < 0.012) return 0;
+      return 0.5;
+    }
+    const old = store.getSync(KEY_MEDIA_QUALITY, 2);
+    if (old == 0) return 1;
+    if (old == 1) return 0.5;
+    if (old == 3) return 0;
+    return 0.5;
   }
 
   static clear(context: common.UIAbilityContext): void {

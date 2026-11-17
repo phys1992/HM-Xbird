@@ -12,9 +12,16 @@ import { MediaCompressor } from '../model/MediaCompressor';
 import { SessionStore } from '../model/SessionStore';
 import { TweetLength } from '../model/TweetLength';
 import { ComposeDraft, DraftStore } from '../model/DraftStore';
+import { I18n } from '../model/I18n';
+import { ProfileCache } from '../model/ProfileCache';
 
 @Component
 export struct ComposeView {
+  @StorageProp('clientLang') clientLanguage: string = 'zh';
+  private tr(value: string): string {
+    return this.clientLanguage.length >= 0 ? I18n.t(value) : I18n.t(value);
+  }
+
   cookie: string = '';
   replyToId: string = '';
   replyToHandle: string = '';
@@ -30,9 +37,8 @@ export struct ComposeView {
   @State showEmoji: boolean = false;
   @State emojiGroups: EmojiGroupData[] = [];
   @State emojiIndex: number = 0;
-  @State imageLimitMb: number = 5;
-  @State gifLimitMb: number = 15;
-  @State mediaQuality: number = 2;
+  @State imageQuality: number = 0.5;
+  @State gifQuality: number = 0.5;
   private areaController: TextAreaController = new TextAreaController();
   private cancelled: boolean = false;
   private posted: boolean = false;
@@ -42,9 +48,8 @@ export struct ComposeView {
   aboutToAppear(): void {
     const ctx = getContext(this) as common.UIAbilityContext;
     this.emojiGroups = EmojiStore.load(ctx);
-    this.imageLimitMb = SessionStore.loadImageLimit(ctx);
-    this.gifLimitMb = SessionStore.loadGifLimit(ctx);
-    this.mediaQuality = SessionStore.loadMediaQuality(ctx);
+    this.imageQuality = SessionStore.loadImageQuality(ctx);
+    this.gifQuality = SessionStore.loadGifQuality(ctx);
     const draft = DraftStore.load(ctx);
     if (draft != null && draft.replyToId == this.replyToId && draft.quoteId == this.quoteId
       && (draft.text.length > 0 || draft.mediaUris.length > 0)) {
@@ -132,9 +137,9 @@ export struct ComposeView {
   }
 
   private title(): string {
-    if (this.replyToId.length > 0) return '回复';
-    if (this.quoteId.length > 0) return '引用';
-    return '发推';
+    if (this.replyToId.length > 0) return this.tr('回复');
+    if (this.quoteId.length > 0) return this.tr('引用');
+    return this.tr('发推');
   }
 
   private async cachePicked(ctx: common.UIAbilityContext, uri: string, index: number): Promise<string> {
@@ -171,14 +176,15 @@ export struct ComposeView {
     const lower = path.toLowerCase();
     if (lower.endsWith('.mp4') || lower.endsWith('.mov')) {
       if (fileIo.statSync(path).size > 512 * MediaCompressor.MB) {
-        throw new Error('视频超过 512MB，请压缩后再上传');
+        throw new Error(this.tr('视频超过 512MB，请压缩后再上传'));
       }
       return path;
     }
     const isGif = lower.endsWith('.gif');
     const mime = isGif ? 'image/gif' : 'image/jpeg';
-    const limit = (isGif ? this.gifLimitMb : this.imageLimitMb) * MediaCompressor.MB;
-    return await MediaCompressor.process(context, path, mime, limit, this.mediaQuality);
+    const limit = (isGif ? 15 : 5) * MediaCompressor.MB;
+    const quality = isGif ? this.gifQuality : this.imageQuality;
+    return await MediaCompressor.process(context, path, mime, limit, quality);
   }
 
   private async pickMedia(): Promise<void> {
@@ -201,7 +207,7 @@ export struct ComposeView {
         this.persistDraft();
       }
     } catch (e) {
-      this.error = `选择图片失败：${e}`;
+      this.error = this.tr(`选择图片失败：${e}`);
     }
   }
 
@@ -227,18 +233,18 @@ export struct ComposeView {
         this.persistDraft();
       }
     } catch (e) {
-      this.error = `拍摄失败：${e}`;
+      this.error = this.tr(`拍摄失败：${e}`);
     }
   }
 
   private async post(): Promise<void> {
     const content = this.text.trim();
     if (content.length == 0 && this.mediaUris.length == 0) {
-      this.error = '内容不能为空';
+      this.error = this.tr('内容不能为空');
       return;
     }
     if (this.overLimit()) {
-      this.error = `内容超过 ${TweetLength.MAX} 字限制`;
+      this.error = this.tr(`内容超过 ${TweetLength.MAX} 字限制`);
       return;
     }
     this.posting = true;
@@ -253,9 +259,11 @@ export struct ComposeView {
         : '';
       await XApi.createTweet(this.cookie, content, this.replyToId, quoteUrl, ids);
       this.stopDraftTimer();
-      DraftStore.clear(getContext(this) as common.UIAbilityContext);
+      const context = getContext(this) as common.UIAbilityContext;
+      DraftStore.clear(context);
+      ProfileCache.notifyChanged();
       this.posted = true;
-      promptAction.showToast({ message: '已发布' });
+      promptAction.showToast({ message: this.tr('已发布') });
       this.onClose();
     } catch (e) {
       this.error = `${e}`;
@@ -269,7 +277,7 @@ export struct ComposeView {
   build() {
     Column() {
       Row() {
-        Button('取消').backgroundColor('#00000000').fontColor($r('app.color.text_primary'))
+        Button(this.tr('取消')).backgroundColor('#00000000').fontColor($r('app.color.text_primary'))
           .onClick(() => {
             this.stopDraftTimer();
             DraftStore.clear(getContext(this) as common.UIAbilityContext);
@@ -282,7 +290,7 @@ export struct ComposeView {
           .fontSize(12)
           .fontColor(this.overLimit() ? '#F4212E' : $r('app.color.text_secondary'))
           .margin({ right: 8 })
-        Button(this.posting ? '发布中…' : '发布')
+        Button(this.posting ? this.tr('发布中…') : this.tr('发布'))
           .enabled(!this.posting)
           .backgroundColor($r('app.color.accent')).fontColor('#FFFFFF').borderRadius(20)
           .onClick(() => this.post())
@@ -290,12 +298,12 @@ export struct ComposeView {
       Divider().strokeWidth(1).color($r('app.color.divider'))
 
       if (this.replyToId.length > 0) {
-        Text(`回复 @${this.replyToHandle}`).fontSize(12).fontColor($r('app.color.text_secondary'))
+        Text(this.tr(`回复 @${this.replyToHandle}`)).fontSize(12).fontColor($r('app.color.text_secondary'))
           .width('100%').padding({ left: 16, bottom: 8 })
       }
       if (this.quoteId.length > 0) {
         Column() {
-          Text(`引用 @${this.quoteHandle}`).fontSize(12).fontColor($r('app.color.text_secondary'))
+          Text(this.tr(`引用 @${this.quoteHandle}`)).fontSize(12).fontColor($r('app.color.text_secondary'))
           if (this.quoteText.length > 0) {
             Text(this.quoteText).fontSize(13).fontColor($r('app.color.text_primary')).maxLines(3)
               .textOverflow({ overflow: TextOverflow.Ellipsis }).margin({ top: 4 })
@@ -313,7 +321,7 @@ export struct ComposeView {
                 if (uri.toLowerCase().endsWith('.mp4') || uri.toLowerCase().endsWith('.mov')) {
                   Stack({ alignContent: Alignment.Center }) {
                     Row().width(78).height(78).borderRadius(10).backgroundColor('#222222')
-                    Text('视频').fontSize(12).fontColor('#FFFFFF')
+                    Text(this.tr('视频')).fontSize(12).fontColor('#FFFFFF')
                   }.width(78).height(78)
                 } else {
                   Image(this.displayUri(uri)).width(78).height(78).borderRadius(10).objectFit(ImageFit.Cover)
@@ -341,7 +349,7 @@ export struct ComposeView {
         }.scrollable(ScrollDirection.Horizontal).scrollBar(BarState.Off)
       }
 
-      TextArea({ placeholder: '有什么新鲜事？', text: this.text, controller: this.areaController })
+      TextArea({ placeholder: this.tr('有什么新鲜事？'), text: this.text, controller: this.areaController })
         .key('composeInput')
         .width('100%').layoutWeight(1).padding(16)
         .backgroundColor(this.glass ? Color.Transparent : $r('app.color.bg'))
@@ -350,16 +358,16 @@ export struct ComposeView {
         .onChange((value: string) => { this.text = value; this.persistDraft(); })
 
       Row() {
-        Button('图片/视频').height(32).fontSize(12)
+        Button(this.tr('图片/视频')).height(32).fontSize(12)
           .backgroundColor($r('app.color.surface_secondary')).fontColor($r('app.color.text_primary'))
           .onClick(() => this.pickMedia())
-        Button('拍照').height(32).fontSize(12).margin({ left: 8 })
+        Button(this.tr('拍照')).height(32).fontSize(12).margin({ left: 8 })
           .backgroundColor($r('app.color.surface_secondary')).fontColor($r('app.color.text_primary'))
           .onClick(() => this.capture(true))
-        Button('录像').height(32).fontSize(12).margin({ left: 8 })
+        Button(this.tr('录像')).height(32).fontSize(12).margin({ left: 8 })
           .backgroundColor($r('app.color.surface_secondary')).fontColor($r('app.color.text_primary'))
           .onClick(() => this.capture(false))
-        Button('表情').height(32).fontSize(12).margin({ left: 8 })
+        Button(this.tr('表情')).height(32).fontSize(12).margin({ left: 8 })
           .backgroundColor(this.showEmoji ? $r('app.color.accent_soft') : $r('app.color.surface_secondary'))
           .fontColor(this.showEmoji ? $r('app.color.accent') : $r('app.color.text_primary'))
           .onClick(() => {
@@ -373,7 +381,7 @@ export struct ComposeView {
         Blank()
         Text(`${this.mediaUris.length}/4`).fontSize(11)
           .fontColor($r('app.color.text_secondary')).margin({ left: 8 })
-        Text('可在系统选择器中编辑').fontSize(10)
+        Text(this.tr('可在系统选择器中编辑')).fontSize(10)
           .fontColor($r('app.color.text_secondary')).margin({ left: 6 })
       }.width('100%').padding({ left: 16, right: 16, top: 6, bottom: 8 })
 
@@ -382,7 +390,7 @@ export struct ComposeView {
           Scroll() {
             Row() {
               ForEach(this.emojiGroups, (group: EmojiGroupData, index: number) => {
-                Button(group.name).height(28).fontSize(11)
+                Button(I18n.emojiGroup(group.name)).height(28).fontSize(11)
                   .backgroundColor(this.emojiIndex == index ? $r('app.color.accent') : Color.Transparent)
                   .fontColor(this.emojiIndex == index ? '#FFFFFF' : $r('app.color.text_secondary'))
                   .onClick(() => this.emojiIndex = index)
@@ -391,7 +399,7 @@ export struct ComposeView {
           }.scrollable(ScrollDirection.Horizontal).scrollBar(BarState.Off).height(34)
 
           if (this.currentEmojis().length == 0) {
-            Text('使用表情后会出现在这里').fontSize(12).fontColor($r('app.color.text_secondary'))
+            Text(this.tr('使用表情后会出现在这里')).fontSize(12).fontColor($r('app.color.text_secondary'))
               .width('100%').textAlign(TextAlign.Center).padding(16)
           } else {
             Grid() {

@@ -1,4 +1,5 @@
 import { http } from '@kit.NetworkKit';
+import { I18n } from '../model/I18n';
 
 const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36';
 
@@ -91,7 +92,7 @@ export class QueryIds {
       earlyFallback.set('HomeTimeline', '0toR0MxC06yY3Fc57GXBpA');
       earlyFallback.set('HomeLatestTimeline', 'PyccKQwFZpSmD1revPllaA');
       earlyFallback.set('UserByRestId', 'mxaYWwt52eAb6OAzYHMVzg');
-      earlyFallback.set('UserTweets', 'OdBLACRZ0-9NikpJotaT7g');
+      earlyFallback.set('UserTweets', 'RyDU3I9VJtPF-Pnl6vrRlw');
       earlyFallback.set('UserByScreenName', 'AMIBMjtxEEATh4z8V9GtRg');
       const early = earlyFallback.get(operation);
       if (early != undefined) return early;
@@ -162,10 +163,10 @@ export class QueryIds {
     fallback.set('HomeTimeline', '0toR0MxC06yY3Fc57GXBpA');
     fallback.set('HomeLatestTimeline', 'PyccKQwFZpSmD1revPllaA');
     fallback.set('UserByRestId', 'mxaYWwt52eAb6OAzYHMVzg');
-    fallback.set('UserTweets', 'OdBLACRZ0-9NikpJotaT7g');
+    fallback.set('UserTweets', 'RyDU3I9VJtPF-Pnl6vrRlw');
     fallback.set('UserByScreenName', 'AMIBMjtxEEATh4z8V9GtRg');
     const known = fallback.get(operation);
     if (known != undefined) return known;
-    throw new Error(`无法解析 ${operation} 的 queryId（已扫描 ${urls.length} 个脚本）`);
+    throw new Error(I18n.t(`无法解析 ${operation} 的 queryId（已扫描 ${urls.length} 个脚本）`));
   }
 }

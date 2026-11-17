@@ -1,55 +1,66 @@
 import { image } from '@kit.ImageKit';
 import { fileIo } from '@kit.CoreFileKit';
 import { common } from '@kit.AbilityKit';
+import { I18n } from './I18n';
+import { MediaQuality } from './MediaQuality';
 
 export class MediaCompressor {
-  static readonly MB = 1024 * 1024;
+  // Product convention: 1 MB = 1,000,000 bytes.
+  static readonly MB = 1000 * 1000;
 
-  static qualityValue(level: number): number {
-    if (level == 1) return 90;
-    if (level == 2) return 75;
+  private static nextLowerQuality(quality: number): number {
+    if (quality > 90) return 90;
+    if (quality > 75) return 75;
+    if (quality > 60) return 60;
     return 60;
   }
 
   static async process(context: common.UIAbilityContext, path: string, mime: string,
-    maxBytes: number, level: number): Promise<string> {
+    maxBytes: number, qualityPosition: number): Promise<string> {
     const stat = fileIo.statSync(path);
     const isGif = mime == 'image/gif';
-    if (level == 0) {
-      if (stat.size <= maxBytes) return path;
-      throw new Error(`文件 ${(stat.size / MediaCompressor.MB).toFixed(1)}MB 超过上限 ${(maxBytes / MediaCompressor.MB).toFixed(0)}MB，请选择压缩质量`);
-    }
+    const original = MediaQuality.isOriginal(qualityPosition);
+
+    // 原画默认保留原始文件；只有超过官方上限时才压缩。
+    if (original && stat.size <= maxBytes) return path;
 
     const source = image.createImageSource(path);
     const packer = image.createImagePacker();
     try {
       if (isGif) {
+        let q = original ? 90 : MediaQuality.valueAt(qualityPosition);
+        let data: ArrayBuffer;
         try {
-          const option: image.PackingOption = { format: 'image/gif', quality: 100 };
-          const data = await packer.packing(source, option);
-          if (data.byteLength > maxBytes) throw new Error('GIF 压缩后仍超过大小上限，请先裁剪尺寸');
-          return MediaCompressor.write(context, data, 'gif');
+          data = await packer.packing(source, { format: 'image/gif', quality: q });
         } catch (e) {
-          if (stat.size <= maxBytes) return path;
+          if (original && stat.size <= maxBytes) return path;
           throw e as Error;
         }
+        while (data.byteLength > maxBytes && q > 60) {
+          q = MediaCompressor.nextLowerQuality(q);
+          data = await packer.packing(source, { format: 'image/gif', quality: q });
+        }
+        if (data.byteLength > maxBytes) {
+          throw new Error(I18n.t('GIF 压缩到省流后仍超过大小上限，请先裁剪尺寸'));
+        }
+        return MediaCompressor.write(context, data, 'gif');
       }
 
       let pixel = await source.createPixelMap();
-      let quality = MediaCompressor.qualityValue(level);
-      let data = await packer.packing(pixel, { format: 'image/jpeg', quality: quality });
-      while (data.byteLength > maxBytes && quality > 30) {
-        quality -= 10;
-        data = await packer.packing(pixel, { format: 'image/jpeg', quality: quality });
+      try {
+        let q = original ? 90 : MediaQuality.valueAt(qualityPosition);
+        let data = await packer.packing(pixel, { format: 'image/jpeg', quality: q });
+        while (data.byteLength > maxBytes && q > 60) {
+          q = MediaCompressor.nextLowerQuality(q);
+          data = await packer.packing(pixel, { format: 'image/jpeg', quality: q });
+        }
+        if (data.byteLength > maxBytes) {
+          throw new Error(I18n.t('图片压缩到省流后仍超过大小上限，请裁剪尺寸'));
+        }
+        return MediaCompressor.write(context, data, 'jpg');
+      } finally {
+        pixel.release();
       }
-      let scaleCount = 0;
-      while (data.byteLength > maxBytes && scaleCount < 6) {
-        await pixel.scale(0.8, 0.8);
-        data = await packer.packing(pixel, { format: 'image/jpeg', quality: 75 });
-        scaleCount++;
-      }
-      pixel.release();
-      return MediaCompressor.write(context, data, 'jpg');
     } finally {
       packer.release();
       source.release();
